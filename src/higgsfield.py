@@ -76,6 +76,8 @@ def generate(prompt: str, aspect_ratio: str = "4:5", timeout_s: int = 240) -> Im
     cfg = CFG["higgsfield"]
     body = dict(cfg.get("extra_params") or {})
     body[cfg.get("prompt_field", "prompt")] = f"{prompt}. {cfg['style_suffix']}"
+    # soul v2 takes 9:16 16:9 4:3 3:4 1:1 2:3 3:2 — map ours to the nearest; the card crops to 4:5 anyway
+    aspect_ratio = {"4:5": "3:4", "5:4": "4:3"}.get(aspect_ratio, aspect_ratio)
     body[cfg.get("aspect_field", "aspect_ratio")] = aspect_ratio
     body[cfg.get("resolution_field", "resolution")] = cfg.get("resolution", "1K")
 
