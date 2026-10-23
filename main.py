@@ -12,7 +12,7 @@ import json
 import sys
 from datetime import datetime
 
-from src import analyst, facebook, imagery, instagram, scorer, sources, writer
+from src import alerts, analyst, facebook, imagery, instagram, scorer, sources, writer
 from src.common import CFG, OUT, db, load_tuning, log, now, now_local
 from src.render import render
 
@@ -103,6 +103,11 @@ def post(force: bool = False) -> None:
     except Exception as e:  # noqa: BLE001
         mid, link, status, note = None, None, "failed", str(e)[:500]
         log.error("publish failed: %s", e)
+        low = str(e).lower()
+        hint = ("The Facebook token or Page access was revoked — regenerate the system user token in "
+                "Meta Business settings and update FB_ACCESS_TOKEN." if ("token" in low or "permission" in low
+                or "oauth" in low or "session" in low) else "")
+        alerts.raise_("Facebook post failed", f"{e}\n\n{hint}\n\nStory: {story['title']}")
     con.execute("""insert into posts (created_at, slot, story_key, title, category, region, headline,
                    caption, hashtags, image_source, palette, score, signals, ig_media_id, permalink,
                    status, note) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -144,6 +149,8 @@ def post_queued(con, slot: str) -> bool:
             status, note = "posted", "queued"
         except Exception as e:  # noqa: BLE001
             mid, link, status, note = None, None, ("dry_run" if str(e) == "dry_run" else "failed"), str(e)[:300]
+            if status == "failed":
+                alerts.raise_("Facebook post failed (queued story)", f"{e}\n\nStory: {item['title']}")
         con.execute("""insert into posts (created_at, slot, story_key, title, category, region, headline,
                        caption, hashtags, image_source, palette, score, signals, ig_media_id, permalink,
                        status, note) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", row + (mid, link, status, note))
@@ -156,7 +163,7 @@ def post_queued(con, slot: str) -> bool:
     return False
 
 
-def main() -> None:
+def _run() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "post"
     force = "--now" in sys.argv or "--force" in sys.argv
     if cmd == "post":
@@ -170,11 +177,38 @@ def main() -> None:
         print(_j.dumps((facebook if CFG["platform"] == "facebook" else instagram).whoami(), indent=2))
         from src import higgsfield
         print("higgsfield:", higgsfield.auth_check())
+    elif cmd == "test-alert":
+        alerts.raise_("Test alert", "This is a test. If you got this as an email, alerts work. Close this issue.", "warning")
     elif cmd == "report":
         reps = sorted((analyst.REPORTS).glob("*.md"))
         print(reps[-1].read_text() if reps else "no reports yet")
     else:
         print(__doc__)
+
+
+def stale_check() -> None:
+    """no successful post for 6h while live → something is silently wrong."""
+    if CFG["mode"] != "auto":
+        return
+    con = db()
+    last = con.execute("select created_at from posts where status='posted' order by id desc limit 1").fetchone()
+    if last and (now() - datetime.fromisoformat(last["created_at"])).total_seconds() > 6 * 3600:
+        alerts.raise_("No post in the last 6 hours",
+                      f"Last successful post: {last['created_at']} UTC. Check recent runs, credits and the "
+                      "Facebook token.")
+
+
+def main() -> None:
+    try:
+        _run()
+        if (sys.argv[1] if len(sys.argv) > 1 else "post") == "post":
+            stale_check()
+    except Exception as e:  # noqa: BLE001
+        alerts.from_exception(" ".join(sys.argv[1:]) or "post", e)
+    finally:
+        alerts.flush()
+    if alerts.has_errors():
+        sys.exit(1)
 
 
 if __name__ == "__main__":

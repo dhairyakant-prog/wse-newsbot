@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "post | analyze | check"
+        description: "post | analyze | check | test-alert"
         default: "post"
 
 concurrency:
@@ -32,12 +32,14 @@ concurrency:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       HF_API_KEY_ID: ${{ secrets.HF_API_KEY_ID }}
       HF_API_KEY_SECRET: ${{ secrets.HF_API_KEY_SECRET }}
@@ -81,6 +83,10 @@ jobs:
         if: steps.task.outputs.t == 'check'
         run: python main.py check
 
+      - name: test alert
+        if: steps.task.outputs.t == 'test-alert'
+        run: python main.py test-alert
+
       - name: analyze
         if: steps.task.outputs.t == 'analyze'
         run: python main.py analyze ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
@@ -93,6 +99,16 @@ jobs:
           path: out/
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: alert if the run itself broke
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list --label bot-alert --state open --search "Run failed" --json number -q '.[0].number' > n.txt || true
+          if [ -s n.txt ]; then gh issue comment "$(cat n.txt)" --body "Failed again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; \
+          else gh issue create --title "⚠ Run failed" --label bot-alert --assignee "${{ github.repository_owner }}" \
+            --body "A newsbot run failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; fi || true
 
       - name: save state
         if: always()

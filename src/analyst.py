@@ -349,6 +349,9 @@ def run(force: bool = False) -> str | None:
                          json.dumps(c["new"], ensure_ascii=False), c["reason"]))
         con.commit()
     md = write_report(rows, diagnosis, alerts, changes, enough)
+    from . import alerts as _al
+    for a in alerts:
+        _al.raise_("72h review: needs your attention", a, "warning")
     try:
         _email(md, alerts)
     except Exception as e:  # noqa: BLE001
