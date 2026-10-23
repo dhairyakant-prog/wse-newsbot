@@ -93,7 +93,11 @@ def generate(prompt: str, aspect_ratio: str = "4:5", timeout_s: int = 240) -> Im
         log.warning("higgsfield submit %s: %s", r.status_code, r.text[:300])
         from . import alerts
         low = r.text.lower()
-        if r.status_code in (401, 403):
+        if "credit" in low or "balance" in low or r.status_code == 402:
+            alerts.raise_("Higgsfield credits exhausted", "Posts are going out without generated images.\n\n"
+                          f"HTTP {r.status_code}: {r.text[:300]}\n\nAdd API credits at cloud.higgsfield.ai "
+                          "(API credits are separate from the Higgsfield app subscription).", "warning")
+        elif r.status_code in (401, 403):
             alerts.raise_("Higgsfield keys rejected", f"HTTP {r.status_code}: {r.text[:300]}\n\n"
                           "Check HF_API_KEY_ID / HF_API_KEY_SECRET in GitHub secrets (cloud.higgsfield.ai → API keys).", "warning")
         elif r.status_code == 402 or "credit" in low or "balance" in low or "insufficient" in low:
