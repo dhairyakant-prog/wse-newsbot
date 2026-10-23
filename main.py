@@ -36,7 +36,7 @@ def slot_active(slot: str) -> bool:
     return slot in ranked[:n]
 
 
-def post(force: bool = False) -> None:
+def post(force: bool = False, preview: bool = False) -> None:
     slot = current_slot(force)
     if not slot:
         log.info("no slot right now")
@@ -51,7 +51,7 @@ def post(force: bool = False) -> None:
         log.info("too soon after last post")
         return
 
-    if post_queued(con, slot):
+    if not preview and post_queued(con, slot):
         return
 
     stories = sources.discover()
@@ -77,7 +77,7 @@ def post(force: bool = False) -> None:
            " ".join(copy["hashtags"]), img["source"], story["category"], story["final"],
            json.dumps({**signals, "explore": story.get("explore", False)}))
 
-    if CFG["mode"] != "auto":
+    if CFG["mode"] != "auto" or preview:
         con.execute("""insert into posts (created_at, slot, story_key, title, category, region, headline,
                        caption, hashtags, image_source, palette, score, signals, status, note)
                        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", row + ("dry_run", str(path)))
@@ -177,6 +177,8 @@ def _run() -> None:
         print(_j.dumps((facebook if CFG["platform"] == "facebook" else instagram).whoami(), indent=2))
         from src import higgsfield
         print("higgsfield:", higgsfield.auth_check())
+    elif cmd == "preview":
+        post(True, preview=True)
     elif cmd == "test-image":
         from src import higgsfield
         img = higgsfield.generate("a quiet European city square at dawn, wet cobblestones", "4:5")

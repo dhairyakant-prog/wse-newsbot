@@ -41,12 +41,18 @@ Return JSON:
  "hashtags": ["8-12 tags without #: 2 broad, 4-6 topic-specific, 2-3 long-tail. no party tags"],
  "alt_text": "one sentence describing the card for screen readers",
  "image": {{
-   "subject_type": "person if the story centres on one named public figure, else scene",
-   "person_name": "their exact Wikipedia article title, else null",
-   "scene_prompt": "a photo prompt for the MAIN image when there is no person, or as backup:
-                    a concrete, literal scene that fits the story without implying anything false
-                    (e.g. 'container ships waiting outside a Gulf port at dusk'). NEVER name or
-                    describe a real identifiable person. no text in image.",
+   "subject_type": "person whenever ANY named public figure appears in the material above (the subject,
+                    the official who announced it, the minister/CEO/mayor/leader responsible, the athlete,
+                    the person quoted). scene only if no named public figure is mentioned at all.",
+   "person_name": "the single most relevant named public figure, as their exact Wikipedia article title.
+                   must be named in the material above — never guess who is involved. null if none.",
+   "scene_prompt": "a photo prompt used when there is no person (or the photo is unavailable). it MUST
+                    feature an anonymous ordinary person with their face clearly visible, close or
+                    medium shot, reacting to or living the story — e.g. 'a young couple outside a
+                    suburban house with a for-sale sign, looking hopeful', 'a commuter on a Paris
+                    bike lane, morning light'. the person is fictional and generic: NEVER a real,
+                    named or identifiable person, no politicians, no celebrities, no uniforms that
+                    imply a specific real official. no text in image.",
    "inset_prompt": "a photo prompt for the small context circle: one object or place that explains the
                     story at a glance (e.g. 'a petrol pump price board in a European town'). same rules.",
    "stock_query": "2-4 word stock-photo search as last resort"

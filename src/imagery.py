@@ -110,7 +110,7 @@ def build(brief: dict, style: str = "photo") -> dict:
     res = {"hero": None, "inset": None, "credits": [], "source": "none"}
     if style == "text-only":
         return res
-    person = brief.get("person_name") if brief.get("subject_type") == "person" else None
+    person = brief.get("person_name") or None
     names = [person] if person else []
 
     if person:
@@ -123,9 +123,11 @@ def build(brief: dict, style: str = "photo") -> dict:
 
     if res["hero"] is None and brief.get("scene_prompt"):
         prompt = _scrub(brief["scene_prompt"], names)
-        if CFG.get("card", {}).get("layout") == "cinema":     # text sits on the top 45%
-            prompt += (". main subject in the lower half of the frame; upper half is calm sky,"
-                       " ceiling or soft background as negative space")
+        prompt += (". candid editorial photograph of a fictional, non-identifiable ordinary person,"
+                   " face clearly visible and expressive")
+        if CFG.get("card", {}).get("layout") in ("cinema", "cinema_bottom", "poster"):
+            prompt += (". person in the lower half of the frame; upper half is calm sky,"
+                       " wall or soft background as negative space")
         img = higgsfield.generate(prompt, "4:5")
         if img:
             res.update(hero={"kind": "scene", "image": img}, source="higgsfield")

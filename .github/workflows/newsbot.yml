@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "post | analyze | check | test-alert | test-image"
+        description: "post | preview | analyze | check | test-alert | test-image"
         default: "post"
 
 concurrency:
@@ -90,6 +90,10 @@ jobs:
       - name: test image
         if: steps.task.outputs.t == 'test-image'
         run: python main.py test-image
+
+      - name: preview (renders, never posts)
+        if: steps.task.outputs.t == 'preview'
+        run: python main.py preview
 
       - name: analyze
         if: steps.task.outputs.t == 'analyze'

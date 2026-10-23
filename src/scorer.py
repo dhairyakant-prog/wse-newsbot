@@ -32,7 +32,8 @@ PROMPT = """Score each story below. For each, return an object:
                       statement, official figure, court ruling, market move, or a named study/report
                       (attributed). false only for rumours, anonymous leaks, unverified claims, speculation,
                       or opinion pieces,
- "evergreen_minutes": how long this stays postable, estimate in minutes
+ "evergreen_minutes": how long this stays postable, estimate in minutes,
+ "has_face": true if a named public figure is central to the story (subject, announcer, quoted)
 }}
 Return a JSON array, same order.
 
@@ -101,7 +102,8 @@ def score(stories: list[dict]) -> list[dict]:
             reason = "not a confirmed fact"
         base = (w["llm_virality"] * s["llm_virality"] + _prescore(s, w))       # 0–1
         cat_w = t["category_weights"].get(s["category"], 1.0)
-        s["final"] = round(10 * base * cat_w, 2)
+        face_w = 1.15 if j.get("has_face") else 1.0          # cards with a real face perform better
+        s["final"] = round(10 * base * cat_w * face_w, 2)
         s["reject_reason"] = reason
         con.execute("insert or replace into seen values (?,?,?,?,?)",
                     (s["key"], s["title"], now().isoformat(),
