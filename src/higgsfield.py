@@ -10,12 +10,13 @@ models or rename a field without touching code.
 from __future__ import annotations
 
 import io
+import os
 import time
 
 import requests
 from PIL import Image
 
-from .common import CFG, env, log
+from .common import CFG, log
 
 BASE = "https://api.higgsfield.ai"
 DONE = {"completed", "succeeded", "success", "finished", "done"}
@@ -25,9 +26,22 @@ FAILED = {"failed", "error", "nsfw", "canceled", "cancelled", "rejected"}
 _AUTH_STYLE = None   # remembers which auth worked: "key" | "hf"
 
 
+def _creds() -> tuple[str, str]:
+    """higgsfield shows one combined key "id:secret". accept it in either secret, or split fields."""
+    kid = (os.environ.get("HF_API_KEY_ID") or "").strip()
+    sec = (os.environ.get("HF_API_KEY_SECRET") or "").strip()
+    for v in (kid, sec, os.environ.get("HF_KEY", "").strip()):
+        if ":" in v:
+            a, b = v.split(":", 1)
+            return a.strip(), b.strip()
+    if not (kid and sec):
+        raise RuntimeError("missing HF_API_KEY_ID / HF_API_KEY_SECRET")
+    return kid, sec
+
+
 def _headers(style: str | None = None) -> dict:
     style = style or _AUTH_STYLE or "key"
-    kid, sec = env("HF_API_KEY_ID").strip(), env("HF_API_KEY_SECRET").strip()
+    kid, sec = _creds()
     base = {"Content-Type": "application/json", "Accept": "application/json"}
     if style == "hf":          # older platform header style
         return {**base, "hf-api-key": kid, "hf-secret": sec}
@@ -102,11 +116,10 @@ def generate(prompt: str, aspect_ratio: str = "4:5", timeout_s: int = 240) -> Im
 
 def auth_check() -> str:
     """free check: ask for the status of a made-up request. 404 = keys ok; 401/403 = bad keys."""
-    kid, sec = env("HF_API_KEY_ID"), env("HF_API_KEY_SECRET")
-    out = [f"id len {len(kid.strip())} (starts {kid.strip()[:4]}…), secret len {len(sec.strip())},"
-           f" whitespace stripped: {kid != kid.strip() or sec != sec.strip()}"]
+    kid, sec = _creds()
+    out = [f"id len {len(kid)}, secret len {len(sec)}"]
     for style in ("key", "hf"):
         r = requests.get(f"{BASE}/requests/00000000-0000-0000-0000-000000000000/status",
                          headers=_headers(style), timeout=30)
-        out.append(f"{style}: http {r.status_code} {r.text[:160]}")
+        out.append(f"{style}: http {r.status_code} {r.text[:120]}")
     return " | ".join(out)
