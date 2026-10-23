@@ -12,7 +12,7 @@ page:
 
 platform: "facebook"             # facebook | instagram
 
-mode: "dry_run"                  # dry_run → renders only, no posting. switch to "auto" when happy.
+mode: "auto"                     # live: posts to the facebook page. set back to "dry_run" to pause.
 
 llm:
   model: "claude-sonnet-5-5"
