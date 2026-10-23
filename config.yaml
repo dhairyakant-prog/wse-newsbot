@@ -1,0 +1,110 @@
+# ─────────────────────────────────────────────────────────────
+#  newsbot config — everything the system is allowed to tune
+#  lives in state/tuning.json, not here. this file is your
+#  hard settings: the analyst never edits it.
+# ─────────────────────────────────────────────────────────────
+
+page:
+  handle: "@wsenews"             # printed on every card — change if the handle differs
+  name: "WSE News"
+  wordmark: ["WSE", "News"]      # fallback if assets/logo.png is missing
+  timezone: "UTC"                # slots below are UTC
+
+platform: "facebook"             # facebook | instagram
+
+mode: "dry_run"                  # dry_run → renders only, no posting. switch to "auto" when happy.
+
+llm:
+  model: "claude-sonnet-5-5"
+  max_tokens: 2000
+
+coverage:
+  # only these regions are ever posted. anything else is dropped at scoring.
+  regions: ["us", "europe", "middle_east"]
+  target_mix: { us: 0.45, europe: 0.30, middle_east: 0.25 }   # starting point; analyst retunes
+
+posting:
+  max_posts_per_day: 15          # hard ceiling; analyst can never go above this
+  min_posts_per_day: 10          # analyst never cuts below this
+  start_posts_per_day: 12        # where it starts before the first 72h review
+  min_gap_minutes: 75
+  # 15 slots in UTC, every 90 min, skipping 03:00 (europe asleep, us late night).
+  # IST = UTC + 5:30. when posts/day < 15, the weakest-performing slots go quiet first.
+  slots: ['00:00', '01:30', '04:30', '06:00', '07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30', '18:00', '19:30', '21:00', '22:30']
+
+discovery:
+  lookback_hours: 10
+  # google news editions (top stories + topic sections)
+  editions:
+    us:     { gl: "US", hl: "en-US", ceid: "US:en" }
+    europe: { gl: "GB", hl: "en-GB", ceid: "GB:en" }
+  topics: ["WORLD", "NATION", "BUSINESS", "TECHNOLOGY", "ENTERTAINMENT", "SPORTS", "SCIENCE", "HEALTH"]
+  # google news searches, last 24h, per region (fills gaps the editions miss)
+  searches:
+    europe: ["European Union", "Germany", "France", "Ukraine", "Italy OR Spain", "NATO"]
+    middle_east: ["Middle East", "Israel", "Iran", "Saudi Arabia", "UAE OR Dubai OR Qatar",
+                  "Gaza OR Lebanon OR Syria", "Turkey Erdogan", "Egypt"]
+  reddit_subs: ["worldnews", "news", "europe", "unitedkingdom", "MiddleEastNews", "technology"]
+  trends_geo: ["US", "GB", "DE", "AE", "SA"]
+  min_independent_sources: 2     # story must be carried by ≥ N different outlets
+
+safety:
+  # never auto-post these. they need a human.
+  blocked_themes:
+    - "sectarian, religious or ethnic violence"
+    - "riots, lynching, mob violence"
+    - "suicide or self-harm"
+    - "sexual assault"
+    - "graphic crime, deaths of private individuals"
+    - "graphic war imagery or casualty descriptions"
+    - "unverified strike, casualty or battlefield claims (only one side's account, not independently confirmed)"
+    - "unverified allegations against named individuals"
+    - "ongoing criminal trials framed as guilt"
+    - "election results before official certification or major-outlet projection"
+    - "health misinformation, miracle cures"
+  max_risk_score: 3              # 0–10 from the safety pass; above this = skip
+
+images:
+  # story about a named person → real CC-licensed photo from wikimedia, cut out, credited.
+  # everything else (scenes, objects, context circle) → higgsfield 1K generation.
+  # higgsfield is never asked to draw a real, identifiable person.
+  person_source: "wikimedia"
+  stock_fallback: ["pexels", "unsplash"]   # used only if higgsfield fails
+
+higgsfield:
+  model_path: "higgsfield-ai/soul/v2/standard"   # swap to any image model path from docs.higgsfield.ai
+  resolution: "1K"
+  resolution_field: "resolution"
+  aspect_field: "aspect_ratio"
+  prompt_field: "prompt"
+  extra_params: {}                 # anything else the chosen model needs
+  style_suffix: >-
+    editorial news photograph, natural light, soft pastel colour grade, clean composition,
+    no text, no logos, no watermarks, no identifiable real people
+
+card:
+  inset: false                   # context circle on the image — off (also saves one higgsfield image per post)
+  layout: "cinema"               # cinema | poster | glass | stack | framed | split
+
+hosting:
+  provider: "cloudinary"         # only used when platform is instagram
+
+palettes:
+  # category → [page top, gradient bottom, highlight bar, ink]
+  us:             ["#F5F9FE", "#D4E4F6", "#B9D4F4", "#15202D"]
+  europe:         ["#F9F7FE", "#E0D8F6", "#D2C6F5", "#1D1730"]
+  middle_east:    ["#FFF8F1", "#F6DCC6", "#FBC9A4", "#2A1E16"]
+  technology:     ["#F4FCFB", "#CDEBE7", "#B5E3DD", "#112523"]
+  business:       ["#F6FBF5", "#D3EBD1", "#BFE3BC", "#15241A"]
+  entertainment:  ["#FFF6F9", "#F5D6E1", "#F6C1D3", "#2C1520"]
+  sports:         ["#FFFCF2", "#F5EBC4", "#F7E19A", "#28220F"]
+  science:        ["#F2FAFD", "#CFE8F2", "#B3DDED", "#10232B"]
+  health:         ["#F5FBF7", "#D3EDDD", "#BEE5CD", "#132519"]
+  default:        ["#FBF9F5", "#E9E2D6", "#E3D6C1", "#22201B"]
+
+analyst:
+  every_hours: 72
+  min_posts_for_decisions: 8     # below this the analyst only reports, doesn't change anything
+  max_weight_change: 0.25        # ±25% per cycle on any tunable
+  exploration_share: 0.2         # 20% of posts deliberately ignore learned weights
+  notify_email: ""               # optional; set SMTP_* secrets to receive reports

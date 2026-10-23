@@ -1,0 +1,104 @@
+name: newsbot
+
+on:
+  schedule:
+    # post slots (UTC) — keep in sync with config.yaml posting.slots
+    - cron: "0 0 * * *"
+    - cron: "30 1 * * *"
+    - cron: "30 4 * * *"
+    - cron: "0 6 * * *"
+    - cron: "30 7 * * *"
+    - cron: "0 9 * * *"
+    - cron: "30 10 * * *"
+    - cron: "0 12 * * *"
+    - cron: "30 13 * * *"
+    - cron: "0 15 * * *"
+    - cron: "30 16 * * *"
+    - cron: "0 18 * * *"
+    - cron: "30 19 * * *"
+    - cron: "0 21 * * *"
+    - cron: "30 22 * * *"
+    # analyst check (runs only when 72h have passed since the last review)
+    - cron: "47 2 * * *"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "post | analyze | check"
+        default: "post"
+
+concurrency:
+  group: newsbot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      HF_API_KEY_ID: ${{ secrets.HF_API_KEY_ID }}
+      HF_API_KEY_SECRET: ${{ secrets.HF_API_KEY_SECRET }}
+      FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.u2net
+          key: u2net-human-seg
+      - run: pip install -r requirements.txt
+
+      - name: decide task
+        id: task
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "t=${{ inputs.task }}" >> $GITHUB_OUTPUT;
+          elif [ "${{ github.event.schedule }}" = "47 2 * * *" ]; then echo "t=analyze" >> $GITHUB_OUTPUT;
+          else echo "t=post" >> $GITHUB_OUTPUT; fi
+
+      - name: post
+        if: steps.task.outputs.t == 'post'
+        run: python main.py post ${{ github.event_name == 'workflow_dispatch' && '--now' || '' }}
+
+      - name: check
+        if: steps.task.outputs.t == 'check'
+        run: python main.py check
+
+      - name: analyze
+        if: steps.task.outputs.t == 'analyze'
+        run: python main.py analyze ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
+
+      - name: keep rendered cards
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cards-${{ github.run_id }}
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: save state
+        if: always()
+        run: |
+          git config user.name "newsbot"
+          git config user.email "newsbot@users.noreply.github.com"
+          git add state reports || true
+          git diff --cached --quiet || git commit -m "newsbot state $(date -u +%FT%TZ)"
+          git push
