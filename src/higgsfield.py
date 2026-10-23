@@ -98,3 +98,13 @@ def generate(prompt: str, aspect_ratio: str = "4:5", timeout_s: int = 240) -> Im
             return Image.open(io.BytesIO(img.content)).convert("RGB")
     log.warning("higgsfield timed out after %ss", timeout_s)
     return None
+
+
+def auth_check() -> str:
+    """free check: ask for the status of a made-up request. 401/403 = bad keys, 404 = keys ok."""
+    for style in ("key", "hf"):
+        r = requests.get(f"{BASE}/requests/00000000-0000-0000-0000-000000000000/status",
+                         headers=_headers(style), timeout=30)
+        if r.status_code not in (401, 403):
+            return f"keys OK (auth style '{style}', http {r.status_code})"
+    return f"keys REJECTED (http {r.status_code}): {r.text[:200]}"

@@ -79,6 +79,13 @@ def post(force: bool = False) -> None:
                        caption, hashtags, image_source, palette, score, signals, status, note)
                        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", row + ("dry_run", str(path)))
         con.commit()
+        prev = OUT.parent / "previews"
+        prev.mkdir(exist_ok=True)
+        import shutil
+        shutil.copy(path, prev / path.name)
+        (prev / (path.stem + ".txt")).write_text(caption)
+        for old in sorted(prev.glob("*.jpg"))[:-20]:        # keep the last 20
+            old.unlink(); (prev / (old.stem + ".txt")).unlink(missing_ok=True)
         log.info("dry run → %s", path)
         return
 
@@ -112,6 +119,8 @@ def main() -> None:
     elif cmd == "check":
         import json as _j
         print(_j.dumps((facebook if CFG["platform"] == "facebook" else instagram).whoami(), indent=2))
+        from src import higgsfield
+        print("higgsfield:", higgsfield.auth_check())
     elif cmd == "report":
         reps = sorted((analyst.REPORTS).glob("*.md"))
         print(reps[-1].read_text() if reps else "no reports yet")

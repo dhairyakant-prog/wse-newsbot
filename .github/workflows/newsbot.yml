@@ -99,6 +99,6 @@ jobs:
         run: |
           git config user.name "newsbot"
           git config user.email "newsbot@users.noreply.github.com"
-          git add state reports || true
+          git add state reports previews || true
           git diff --cached --quiet || git commit -m "newsbot state $(date -u +%FT%TZ)"
           git push
