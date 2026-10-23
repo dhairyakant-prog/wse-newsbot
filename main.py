@@ -51,6 +51,9 @@ def post(force: bool = False) -> None:
         log.info("too soon after last post")
         return
 
+    if post_queued(con, slot):
+        return
+
     stories = sources.discover()
     scored = scorer.score(stories)
     story = scorer.pick(scored)
@@ -105,6 +108,52 @@ def post(force: bool = False) -> None:
                    status, note) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 row + (mid, link, status, note))
     con.commit()
+
+
+# ── manual queue: stories you asked for, posted at the right slot ──
+QUEUE = OUT.parent / "state" / "queue.json"
+REGION_HOURS = {            # utc hours when each audience is most active
+    "us": set(range(13, 24)) | {0, 1},
+    "europe": set(range(6, 22)),
+    "middle_east": set(range(4, 20)),
+}
+
+
+def post_queued(con, slot: str) -> bool:
+    if not QUEUE.exists():
+        return False
+    q = json.loads(QUEUE.read_text() or "[]")
+    hour = int(slot[:2])
+    for i, item in enumerate(q):
+        if hour not in REGION_HOURS.get(item.get("region", "us"), set(range(24))):
+            continue
+        copy = item["copy"]
+        img = imagery.build(item.get("image", {}), "photo")
+        stamp = now_local().strftime("%Y%m%d_%H%M")
+        path = render(copy, item["category"], img["hero"], img["inset"], OUT / f"{stamp}_queued.jpg")
+        caption = item["caption"]
+        if img["credits"] and img["credits"][0] not in caption:
+            caption = caption.replace("\n\n#", "\n" + "\n".join(img["credits"]) + "\n\n#", 1)
+        row = (now().isoformat(), slot, item.get("key", "queued"), item["title"], item["category"],
+               item.get("region", "us"), copy["headline"], caption, "", img["source"], item["category"], 10.0,
+               json.dumps({"queued": True}))
+        try:
+            if CFG["mode"] != "auto":
+                raise RuntimeError("dry_run")
+            mid, link = facebook.publish(path, writer.facebook_caption(caption, {"hashtags": item.get("hashtags", [])}))
+            status, note = "posted", "queued"
+        except Exception as e:  # noqa: BLE001
+            mid, link, status, note = None, None, ("dry_run" if str(e) == "dry_run" else "failed"), str(e)[:300]
+        con.execute("""insert into posts (created_at, slot, story_key, title, category, region, headline,
+                       caption, hashtags, image_source, palette, score, signals, ig_media_id, permalink,
+                       status, note) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", row + (mid, link, status, note))
+        con.commit()
+        q.pop(i)
+        QUEUE.write_text(json.dumps(q, indent=2, ensure_ascii=False))
+        log.info("queued story %s → %s %s", item["title"], status, link or note)
+        return True
+    log.info("queue has %d item(s), none for this slot's audience", len(q))
+    return False
 
 
 def main() -> None:

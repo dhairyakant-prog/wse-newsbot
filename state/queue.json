@@ -1,0 +1,28 @@
+[
+  {
+    "key": "trump-bbc-deposition",
+    "title": "Trump ordered to sit for deposition in $10 billion BBC lawsuit",
+    "category": "us",
+    "region": "us",
+    "copy": {
+      "headline": "A US judge ordered Trump to sit for a deposition in his $10 billion BBC defamation lawsuit by December 11.",
+      "highlight_words": 4,
+      "attribution": null,
+      "explainer": "A deposition means answering questions under oath before trial. The judge also warned the case could be thrown out if a dispute over records is not resolved."
+    },
+    "caption": "A US judge has ordered Donald Trump to sit for a deposition in his $10 billion defamation lawsuit against the BBC.\nHe must answer questions under oath by December 11.\nThe judge also warned the case could be tossed in a fight over records.\nShould a sitting president have to testify in civil cases like this one?\n\nsource: AP News, Al Jazeera, Axios\n\n#news",
+    "hashtags": [
+      "news",
+      "uspolitics",
+      "Trump",
+      "BBC",
+      "defamation"
+    ],
+    "image": {
+      "subject_type": "person",
+      "person_name": "Donald Trump",
+      "scene_prompt": "a federal courthouse exterior in Washington DC on an overcast morning",
+      "stock_query": "courthouse"
+    }
+  }
+]
