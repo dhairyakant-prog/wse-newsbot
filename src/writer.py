@@ -30,7 +30,7 @@ Return JSON:
  "headline": "the card text. 10-{hw} words, never longer. one or two plain sentences that carry the whole news.
               if a named person said something notable AND their exact words appear in the material
               above, you may use it as a quote in double quotes; otherwise never use quote marks.",
- "explainer": "2-3 sentences, 35-50 words, printed under the headline. add what the headline does NOT
+ "explainer": "2 sentences, 25-40 words, printed under the headline. add what the headline does NOT
                say: background, why it matters, or what happens next. never repeat a fact, number,
                name or date already in the headline. flowing sentences, not a list of fragments.
                only facts from the material above.",

@@ -142,8 +142,18 @@ def _circle(img, d, ring=7):
     return sh
 
 
+def _fit_sentences(text, font, width, lines_max):
+    """drop trailing sentences until the text fits; never cut mid-sentence if avoidable."""
+    import re as _re
+    sents = _re.split(r"(?<=[.!?])\s+", text.strip())
+    while len(sents) > 1 and len(_wrap(" ".join(sents).split(), font, width)) > lines_max:
+        sents.pop()
+    return " ".join(sents)
+
+
 def _explainer(d, text, x, y, width, color, align="left", size=28, lines_max=4):
     ef = F("body", size)
+    text = _fit_sentences(text, ef, width, lines_max)
     lines = _balanced(text.split(), ef, width)
     if len(lines) > lines_max:
         lines = lines[:lines_max]
@@ -162,6 +172,7 @@ def _explainer(d, text, x, y, width, color, align="left", size=28, lines_max=4):
 def _measure_explainer(text, width, size=28, lines_max=4):
     if not text:
         return 0
+    text = _fit_sentences(text, F("body", size), width, lines_max)
     n = min(lines_max, len(_balanced(text.split(), F("body", size), width)))
     return n * int(size * 1.48)
 
@@ -354,7 +365,16 @@ def _person_stage(img: Image.Image, p: dict, text_end: int) -> Image.Image:
     im = im.resize((max(1, int(im.width * scale)), max(1, int(im.height * scale))), Image.LANCZOS)
     rgb = ImageEnhance.Contrast(ImageEnhance.Color(im.convert("RGB")).enhance(0.92)).enhance(1.05)
     rgb = rgb.convert("RGBA")
-    rgb.putalpha(im.split()[-1])
+    alpha = im.split()[-1]
+    if alpha.getextrema()[0] > 200:                         # no cut-out: feather the rectangle edges
+        f = Image.new("L", im.size, 255)
+        fd = ImageDraw.Draw(f)
+        e = max(20, im.width // 7)
+        for k in range(e):
+            v = int(255 * (k / e) ** 1.6)
+            fd.rectangle([k, k, im.width - 1 - k, im.height + e], outline=v)
+        alpha = ImageChops.multiply(alpha, f.filter(ImageFilter.GaussianBlur(6)))
+    rgb.putalpha(alpha)
     card.alpha_composite(rgb, ((W - rgb.width) // 2, H - rgb.height))
     return card
 
