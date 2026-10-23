@@ -27,7 +27,7 @@ then a short explainer underneath, over a photo. Write in English.
 
 Return JSON:
 {{
- "headline": "the card text. 12-{hw} words. one or two plain sentences that carry the whole news.
+ "headline": "the card text. 10-{hw} words, never longer. one or two plain sentences that carry the whole news.
               if a named person said something notable AND their exact words appear in the material
               above, you may use it as a quote in double quotes; otherwise never use quote marks.",
  "explainer": "2-3 sentences, 35-50 words, printed under the headline. add what the headline does NOT

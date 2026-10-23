@@ -335,13 +335,43 @@ def render_glass(copy, cat, hero, inset, out: Path):
     return out
 
 
+# ── person photo: face always below the text ──────────────────
+def _person_stage(img: Image.Image, p: dict, text_end: int) -> Image.Image:
+    """dark tinted backdrop + the person bottom-aligned so the head starts below the text block."""
+    tint = p["bar"][:3]
+    bg = Image.new("RGB", (W, H), (14, 14, 20))
+    glow = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(glow).ellipse([W * 0.1, H * 0.45, W * 0.9, H * 1.15], fill=110)
+    glow = glow.filter(ImageFilter.GaussianBlur(140))
+    bg = Image.composite(Image.new("RGB", (W, H), tuple(int(c * 0.55) for c in tint)), bg, glow)
+    card = bg.convert("RGBA")
+    im = img.convert("RGBA")
+    if im.getbbox():
+        im = im.crop(im.getbbox())
+    top = max(text_end + 10, int(H * 0.40))                # head starts here at the latest
+    avail_h = H - top
+    scale = min(avail_h / im.height, (W * 0.98) / im.width)
+    im = im.resize((max(1, int(im.width * scale)), max(1, int(im.height * scale))), Image.LANCZOS)
+    rgb = ImageEnhance.Contrast(ImageEnhance.Color(im.convert("RGB")).enhance(0.92)).enhance(1.05)
+    rgb = rgb.convert("RGBA")
+    rgb.putalpha(im.split()[-1])
+    card.alpha_composite(rgb, ((W - rgb.width) // 2, H - rgb.height))
+    return card
+
+
 # ── layout: cinema (text on top) ──────────────────────────────
 def render_cinema(copy, cat, hero, inset, out: Path):
     p = _pal(cat)
-    card = _grade(hero["image"], p["wash"], 0.7) if hero else Image.new("RGBA", (W, H), (20, 20, 26))
     M = 72
     ex_h = _measure_explainer(copy.get("explainer"), W - 2 * M)
-    fn, lines = _fit(copy["headline"], "inst", W - 2 * M, 3, range(96, 58, -2))
+    fn, lines = _fit(copy["headline"], "inst", W - 2 * M, 4, range(96, 52, -2))
+    lh0 = int(fn.size * 1.02)
+    attr_h0 = 44 if copy.get("attribution") else 0
+    text_end = 150 + 40 + len(lines) * lh0 + attr_h0 + 44 + ex_h
+    if hero and hero["kind"] == "cutout":
+        card = _person_stage(hero["image"], p, text_end)
+    else:
+        card = _grade(hero["image"], p["wash"], 0.7) if hero else Image.new("RGBA", (W, H), (20, 20, 26))
     fi = F("inst_i", fn.size)
     lh = int(fn.size * 1.02)
     attr_h = 44 if copy.get("attribution") else 0
