@@ -129,13 +129,45 @@ def llm(system: str, user: str, max_tokens: int | None = None) -> str:
     return "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
 
 
-def llm_json(system: str, user: str, max_tokens: int | None = None):
-    """ask for json, tolerate code fences / chatter around it."""
-    raw = llm(system + "\n\nReturn ONLY valid JSON. No prose, no code fences.", user, max_tokens)
-    m = re.search(r"(\{.*\}|\[.*\])", raw, re.S)
-    if not m:
+def _parse_json_loose(raw: str):
+    """accept: a json value, a value wrapped in prose/code fences, or several top-level
+    objects in a row (returned as a list)."""
+    raw = re.sub(r"```(?:json)?", "", raw)
+    dec = json.JSONDecoder()
+    vals, i = [], 0
+    while i < len(raw):
+        j = min([k for k in (raw.find("{", i), raw.find("[", i)) if k != -1], default=-1)
+        if j == -1:
+            break
+        try:
+            v, end = dec.raw_decode(raw, j)
+        except json.JSONDecodeError:
+            i = j + 1
+            continue
+        vals.append(v)
+        i = end
+    if not vals:
         raise ValueError(f"no json in llm output: {raw[:300]}")
-    return json.loads(m.group(1))
+    if len(vals) == 1:
+        return vals[0]
+    flat = []
+    for v in vals:
+        flat.extend(v if isinstance(v, list) else [v])
+    return flat
+
+
+def llm_json(system: str, user: str, max_tokens: int | None = None):
+    """ask for json; tolerate fences, chatter and object-per-line output; retry once."""
+    sys2 = system + "\n\nReturn ONLY valid JSON. No prose, no code fences."
+    last = None
+    for _ in range(2):
+        raw = llm(sys2, user, max_tokens)
+        try:
+            return _parse_json_loose(raw)
+        except ValueError as e:
+            last = e
+            log.warning("llm json parse failed, retrying: %s", e)
+    raise last
 
 
 def env(name: str, required: bool = True) -> str | None:
