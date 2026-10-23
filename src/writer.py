@@ -11,7 +11,8 @@ Short sentences. Every fact you write must appear in the source material given t
 never add numbers, names, quotes or causes that aren't there. If sources disagree, use the
 cautious version. Neutral on politics: describe what happened, not who is right."""
 
-PROMPT = """Write the post for this story.
+PROMPT = """Write the post for this story. Cover ONLY this one story — the outlet material may include
+unrelated headlines from the same feed; ignore anything not about this exact event.
 
 STORY: {title}
 WHAT OUTLETS ARE REPORTING: {context}

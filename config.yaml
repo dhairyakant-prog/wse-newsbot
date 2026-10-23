@@ -62,7 +62,7 @@ safety:
     - "ongoing criminal trials framed as guilt"
     - "election results before official certification or major-outlet projection"
     - "health misinformation, miracle cures"
-  max_risk_score: 3              # 0–10 from the safety pass; above this = skip
+  max_risk_score: 4              # 0–10 from the safety pass; above this = skip
 
 images:
   # story about a named person → real CC-licensed photo from wikimedia, cut out, credited.

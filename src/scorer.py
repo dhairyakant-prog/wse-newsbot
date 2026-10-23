@@ -28,7 +28,10 @@ PROMPT = """Score each story below. For each, return an object:
                 prejudicing a trial. straight factual reporting of a conflict that major outlets
                 confirm is NOT high risk by itself),
  "blocked_theme": null or the matching theme from this list: {blocked},
- "is_confirmed_fact": true/false (false if it's a claim, rumour, leak, poll, or opinion),
+ "is_confirmed_fact": true/false — true if major outlets report it as fact, OR it is an on-record
+                      statement, official figure, court ruling, market move, or a named study/report
+                      (attributed). false only for rumours, anonymous leaks, unverified claims, speculation,
+                      or opinion pieces,
  "evergreen_minutes": how long this stays postable, estimate in minutes
 }}
 Return a JSON array, same order.
