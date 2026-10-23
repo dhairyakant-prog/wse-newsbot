@@ -22,7 +22,7 @@ def current_slot(force: bool) -> str | None:
     t = now_local()
     mins = t.hour * 60 + t.minute
     best = min(slots, key=lambda s: abs(int(s[:2]) * 60 + int(s[3:]) - mins))
-    if force or abs(int(best[:2]) * 60 + int(best[3:]) - mins) <= 25:
+    if force or abs(int(best[:2]) * 60 + int(best[3:]) - mins) <= 50:   # github cron can start late
         return best
     return None
 
@@ -177,6 +177,16 @@ def _run() -> None:
         print(_j.dumps((facebook if CFG["platform"] == "facebook" else instagram).whoami(), indent=2))
         from src import higgsfield
         print("higgsfield:", higgsfield.auth_check())
+    elif cmd == "test-image":
+        from src import higgsfield
+        img = higgsfield.generate("a quiet European city square at dawn, wet cobblestones", "4:5")
+        prev = OUT.parent / "previews"
+        prev.mkdir(exist_ok=True)
+        if img:
+            img.save(prev / "test_image.jpg", quality=90)
+            print("higgsfield OK", img.size)
+        else:
+            alerts.raise_("Higgsfield test image failed", "see run log", "error")
     elif cmd == "test-alert":
         alerts.raise_("Test alert", "This is a test. If you got this as an email, alerts work. Close this issue.", "warning")
     elif cmd == "report":

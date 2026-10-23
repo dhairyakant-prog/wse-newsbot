@@ -73,7 +73,7 @@ images:
 
 higgsfield:
   model_path: "higgsfield-ai/soul/v2/standard"   # swap to any image model path from docs.higgsfield.ai
-  resolution: "1K"
+  resolution: "1080p"            # soul v2 accepts 720p | 1080p (closest to 1K)
   resolution_field: "resolution"
   aspect_field: "aspect_ratio"
   prompt_field: "prompt"
