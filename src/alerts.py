@@ -50,6 +50,7 @@ def _gh(method: str, path: str, **kw):
 def flush() -> None:
     if not _problems:
         return
+    open("alerted", "w").write("1")          # tells the workflow the bot already reported it
     run = ""
     if os.environ.get("GITHUB_RUN_ID"):
         run = (f"\n\nRun log: {os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/"

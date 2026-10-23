@@ -101,7 +101,7 @@ jobs:
           retention-days: 14
 
       - name: alert if the run itself broke
-        if: failure()
+        if: failure() && hashFiles('alerted') == ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
