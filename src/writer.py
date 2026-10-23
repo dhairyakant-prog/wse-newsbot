@@ -30,9 +30,10 @@ Return JSON:
  "headline": "the card text. 12-{hw} words. one or two plain sentences that carry the whole news.
               if a named person said something notable AND their exact words appear in the material
               above, you may use it as a quote in double quotes; otherwise never use quote marks.",
- "explainer": "3-4 short lines (35-55 words) printed on the card under the headline. explain what it
-               means or why it matters: the context, the numbers, what happens next. plain words,
-               no repetition of the headline, only facts from the material above.",
+ "explainer": "2-3 sentences, 35-50 words, printed under the headline. add what the headline does NOT
+               say: background, why it matters, or what happens next. never repeat a fact, number,
+               name or date already in the headline. flowing sentences, not a list of fragments.
+               only facts from the material above.",
  "highlight_words": "integer — how many opening words go on the highlight bar (the hook — usually 2-5 words; they get the accent colour)",
  "attribution": "for a quote: 'Name, role' (e.g. 'Emmanuel Macron, President of France'); else null",
  "caption": "3-5 short lines. line 1 restates the news. then 2-3 lines of context.
