@@ -156,7 +156,7 @@ def tune(rows: list[dict], prev: list[dict], t: dict, changes: list) -> dict:
     perf = [r["perf"] for r in rows]
     corrs = {s: _corr([r["signals"].get(s, 0) for r in rows], perf) for s in sw}
     if len(rows) >= 12:
-        new_sw = {s: max(0.05, sw[s] * (1 + max(-cap, min(cap, corrs[s])))) for s in sw}
+        new_sw = {s: (0.0 if sw[s] == 0 else max(0.05, sw[s] * (1 + max(-cap, min(cap, corrs[s]))))) for s in sw}
         tot = sum(new_sw.values())
         new_sw = {s: round(v / tot, 3) for s, v in new_sw.items()}
         record("signal_weights", sw, new_sw, f"correlations {json.dumps({k: round(v, 2) for k, v in corrs.items()})}")

@@ -52,8 +52,8 @@ DEFAULT_TUNING = {
     "posts_per_day": CFG["posting"].get("start_posts_per_day"),
     "virality_threshold": 4.5,              # 0–10, final blended score needed to post
     "signal_weights": {                     # how the final score blends signals
-        "llm_virality": 0.45, "coverage": 0.2, "trend_match": 0.15,
-        "reddit_heat": 0.1, "freshness": 0.1},
+        "llm_virality": 0.5, "coverage": 0.2, "trend_match": 0.2,
+        "reddit_heat": 0.0, "freshness": 0.1},
     "copy_guidance": [],                    # short learned rules for the writer
     "hashtag_blocklist": [],
     "hashtag_boost": [],

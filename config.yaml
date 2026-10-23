@@ -44,7 +44,7 @@ discovery:
     europe: ["European Union", "Germany", "France", "Ukraine", "Italy OR Spain", "NATO"]
     middle_east: ["Middle East", "Israel", "Iran", "Saudi Arabia", "UAE OR Dubai OR Qatar",
                   "Gaza OR Lebanon OR Syria", "Turkey Erdogan", "Egypt"]
-  reddit_subs: ["worldnews", "news", "europe", "unitedkingdom", "MiddleEastNews", "technology"]
+  reddit_subs: []                 # reddit blocks github servers; left off
   trends_geo: ["US", "GB", "DE", "AE", "SA"]
   min_independent_sources: 2     # story must be carried by ≥ N different outlets
 

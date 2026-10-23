@@ -22,9 +22,16 @@ DONE = {"completed", "succeeded", "success", "finished", "done"}
 FAILED = {"failed", "error", "nsfw", "canceled", "cancelled", "rejected"}
 
 
-def _headers() -> dict:
-    return {"Authorization": f"Key {env('HF_API_KEY_ID')}:{env('HF_API_KEY_SECRET')}",
-            "Content-Type": "application/json", "Accept": "application/json"}
+_AUTH_STYLE = None   # remembers which auth worked: "key" | "hf"
+
+
+def _headers(style: str | None = None) -> dict:
+    style = style or _AUTH_STYLE or "key"
+    kid, sec = env("HF_API_KEY_ID").strip(), env("HF_API_KEY_SECRET").strip()
+    base = {"Content-Type": "application/json", "Accept": "application/json"}
+    if style == "hf":          # older platform header style
+        return {**base, "hf-api-key": kid, "hf-secret": sec}
+    return {**base, "Authorization": f"Key {kid}:{sec}"}
 
 
 def _find_image_url(obj) -> str | None:
@@ -58,9 +65,17 @@ def generate(prompt: str, aspect_ratio: str = "4:5", timeout_s: int = 240) -> Im
     body[cfg.get("aspect_field", "aspect_ratio")] = aspect_ratio
     body[cfg.get("resolution_field", "resolution")] = cfg.get("resolution", "1K")
 
-    r = requests.post(f"{BASE}/{cfg['model_path'].strip('/')}", json=body, headers=_headers(), timeout=60)
+    global _AUTH_STYLE
+    url = f"{BASE}/{cfg['model_path'].strip('/')}"
+    r = None
+    for style in ([_AUTH_STYLE] if _AUTH_STYLE else ["key", "hf"]):
+        r = requests.post(url, json=body, headers=_headers(style), timeout=60)
+        if r.status_code not in (401, 403):
+            _AUTH_STYLE = style
+            break
     if r.status_code >= 400:
-        log.warning("higgsfield submit %s: %s", r.status_code, r.text[:300])
+        log.warning("higgsfield submit %s: %s  (check HF_API_KEY_ID / HF_API_KEY_SECRET in github secrets"
+                    " — they come from cloud.higgsfield.ai → API keys)", r.status_code, r.text[:300])
         return None
     sub = r.json()
     status_url = sub.get("status_url") or f"{BASE}/requests/{sub.get('request_id')}/status"
