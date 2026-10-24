@@ -84,7 +84,7 @@ higgsfield:
 
 card:
   inset: false                   # context circle on the image — off (also saves one higgsfield image per post)
-  layout: "cinema"               # cinema | poster | glass | stack | framed | split
+  layout: "khabar"               # khabar | cinema | cinema_bottom | poster | glass | stack | framed | split
 
 hosting:
   provider: "cloudinary"         # only used when platform is instagram

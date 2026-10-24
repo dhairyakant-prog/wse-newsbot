@@ -118,14 +118,16 @@ def build(brief: dict, style: str = "photo") -> dict:
         if got:
             cut = cutout(got[0])
             if cut is not None:
-                res.update(hero={"kind": "cutout", "image": cut}, source="wikimedia")
-                res["credits"].append(f"photo: {got[1]}")
+                res.update(hero={"kind": "cutout", "image": cut, "original": got[0]}, source="wikimedia")
+            else:   # keep the real photo even if the cut-out fails — a face beats no face
+                res.update(hero={"kind": "photo", "image": got[0], "original": got[0]}, source="wikimedia")
+            res["credits"].append(f"photo: {got[1]}")
 
     if res["hero"] is None and brief.get("scene_prompt"):
         prompt = _scrub(brief["scene_prompt"], names)
         prompt += (". candid editorial photograph of a fictional, non-identifiable ordinary person,"
                    " face clearly visible and expressive")
-        if CFG.get("card", {}).get("layout") in ("cinema", "cinema_bottom", "poster"):
+        if CFG.get("card", {}).get("layout") in ("cinema", "cinema_bottom", "poster", "khabar"):
             prompt += (". person in the lower half of the frame; upper half is calm sky,"
                        " wall or soft background as negative space")
         img = higgsfield.generate(prompt, "4:5")

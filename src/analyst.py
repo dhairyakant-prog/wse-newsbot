@@ -223,7 +223,7 @@ Return JSON:
  "copy_guidance": ["max 6 short rules for the copywriter, replacing current ones. specific, testable."],
  "hashtag_boost": ["max 5 tags (no #) that keep appearing on top posts"],
  "hashtag_block": ["tags (no #) that keep appearing on bottom posts and look like dead weight"],
- "headline_max_words": integer 10-20,
+ "headline_max_words": integer 7-16,
  "image_style": "photo | illustration-led | text-only",
  "alerts": ["anything a human must look at — e.g. sudden reach collapse (possible restriction),
             a post with unusually many comments (possible controversy), repeated topic fatigue. empty if none."]
@@ -262,7 +262,7 @@ def editorial(rows: list[dict], prev: list[dict], t: dict, changes: list) -> tup
                                      {h.lstrip("#") for h in j.get("hashtag_block", [])})[-40:])
     hw = j.get("headline_max_words", t["headline_max_words"])
     if isinstance(hw, int):
-        setf("headline_max_words", max(10, min(20, hw)))
+        setf("headline_max_words", max(7, min(16, hw)))
     if j.get("image_style") in ("photo", "illustration-led", "text-only"):
         setf("image_style", j["image_style"])
     return j.get("diagnosis", []), j.get("alerts", [])

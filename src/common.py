@@ -57,7 +57,7 @@ DEFAULT_TUNING = {
     "copy_guidance": [],                    # short learned rules for the writer
     "hashtag_blocklist": [],
     "hashtag_boost": [],
-    "headline_max_words": 18,
+    "headline_max_words": 14,
     "image_style": "photo",                 # photo | illustration-led | text-only
     "updated_at": None,
 }

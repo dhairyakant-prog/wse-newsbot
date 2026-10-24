@@ -15,7 +15,8 @@ from .common import CFG, ROOT
 
 W, H = 1080, 1350
 FONTS = ROOT / "fonts"
-FACES = {"inst": "InstrumentSerif-Regular.ttf", "inst_i": "InstrumentSerif-Italic.ttf",
+FACES = {"pop_xb": "Poppins-ExtraBold.ttf", "kalam": "Kalam-Bold.ttf",
+         "inst": "InstrumentSerif-Regular.ttf", "inst_i": "InstrumentSerif-Italic.ttf",
          "anton": "Anton-Regular.ttf", "dmserif": "DMSerifDisplay-Regular.ttf",
          "body": "Inter-Regular.otf", "semi": "Inter-SemiBold.otf", "black": "Inter-Black.otf"}
 
@@ -431,5 +432,87 @@ def render_cinema(copy, cat, hero, inset, out: Path):
     if inset is not None:
         c = _circle(inset, 210)
         card.alpha_composite(c, (W - M - c.width + 40, H - c.height - 60))
+    card.convert("RGB").save(out, "JPEG", quality=93, optimize=True)
+    return out
+
+
+# ── layout: khabar (khabargaon-style) ─────────────────────────
+#   light airy top, logo centred, short bold headline (often a quote),
+#   handwritten "– name / role", big real photo of the person filling the bottom.
+def _soft_bg(img: Image.Image, light=(240, 242, 246)) -> Image.Image:
+    bg = ImageOps.fit(img.convert("RGB"), (W, H), Image.LANCZOS, centering=(0.5, 0.35))
+    bg = bg.filter(ImageFilter.GaussianBlur(22))
+    return Image.blend(bg, Image.new("RGB", (W, H), light), 0.45).convert("RGBA")
+
+
+def _top_light(card: Image.Image, until: int, light=(244, 245, 248)):
+    g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(g)
+    solid = int(until * 0.72)
+    for y in range(until):
+        a = 238 if y < solid else int(238 * (1 - (y - solid) / (until - solid)) ** 1.4)
+        d.line([(0, y), (W, y)], fill=light + (a,))
+    card.alpha_composite(g)
+
+
+def render_khabar(copy, cat, hero, inset, out: Path):
+    ink = (17, 17, 22)
+    light = (244, 245, 248)
+    M = 70
+    quote = bool(copy.get("attribution"))
+    text = copy["headline"].strip()
+    if quote:
+        text = "‘" + text.strip("\"'‘’“” ") + "’"
+    fn, lines = _fit(text, "pop_xb", W - 2 * M, 3, range(62, 40, -2))
+    lh = int(fn.size * 1.22)
+    head_top = 200
+    attr_h = 110 if quote else 0
+    text_end = head_top + len(lines) * lh + attr_h + 20
+
+    # background + photo
+    if hero and hero["kind"] in ("cutout", "photo"):
+        orig = hero.get("original") or hero["image"]
+        card = _soft_bg(orig, light)
+        _top_light(card, text_end + 160, light)
+        person = hero["image"].convert("RGBA")
+        if hero["kind"] == "photo":                     # no cut-out: fade the photo's top and sides
+            f = Image.new("L", person.size, 255)
+            fd = ImageDraw.Draw(f)
+            ew, eh = max(30, person.width // 6), max(60, person.height // 4)
+            for k in range(eh):
+                fd.line([(0, k), (person.width, k)], fill=int(255 * (k / eh) ** 1.5))
+            fx = Image.new("L", person.size, 255)
+            fxd = ImageDraw.Draw(fx)
+            for k in range(ew):
+                v = int(255 * (k / ew) ** 1.5)
+                fxd.line([(k, 0), (k, person.height)], fill=v)
+                fxd.line([(person.width - 1 - k, 0), (person.width - 1 - k, person.height)], fill=v)
+            person.putalpha(ImageChops.multiply(f, fx))
+        if person.getbbox():
+            person = person.crop(person.getbbox())
+        top = max(text_end - 30, int(H * 0.36))
+        scale = min((H - top) / person.height, (W * 1.05) / person.width)
+        person = person.resize((max(1, int(person.width * scale)), max(1, int(person.height * scale))), Image.LANCZOS)
+        card.alpha_composite(person, ((W - person.width) // 2, H - person.height))
+    elif hero:                                          # ai scene: full bleed, light top
+        card = ImageOps.fit(hero["image"].convert("RGB"), (W, H), Image.LANCZOS, centering=(0.5, 0.6)).convert("RGBA")
+        _top_light(card, text_end + 220, light)
+    else:
+        card = Image.new("RGBA", (W, H), light + (255,))
+
+    d = ImageDraw.Draw(card)
+    lg = bug(60, news_color=(17, 17, 22))
+    card.alpha_composite(lg, ((W - lg.width) // 2, 64))
+
+    y = head_top
+    for ln in lines:
+        d.text((W / 2, y + lh / 2), " ".join(ln), font=fn, fill=ink, anchor="mm")
+        y += lh
+    if quote:
+        name, _, role = copy["attribution"].partition(",")
+        af = F("kalam", 38)
+        d.text((W - M, y + 20), f"– {name.strip()}", font=af, fill=ink, anchor="ra")
+        if role.strip():
+            d.text((W - M, y + 64), role.strip(), font=af, fill=ink, anchor="ra")
     card.convert("RGB").save(out, "JPEG", quality=93, optimize=True)
     return out
