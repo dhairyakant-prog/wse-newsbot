@@ -456,64 +456,69 @@ def _top_light(card: Image.Image, until: int, light=(244, 245, 248)):
     card.alpha_composite(g)
 
 
+def _photo_light(img: Image.Image) -> tuple:
+    """a soft light colour taken from the top of the photo, so the fade looks natural."""
+    top = img.convert("RGB").resize((40, 40)).crop((0, 0, 40, 6))
+    px = list(top.getdata())
+    avg = tuple(sum(c[i] for c in px) // len(px) for i in range(3))
+    return tuple(int(avg[i] * 0.35 + 255 * 0.65) for i in range(3))
+
+
 def render_khabar(copy, cat, hero, inset, out: Path):
     ink = (17, 17, 22)
-    light = (244, 245, 248)
-    M = 70
+    M = 64
     quote = bool(copy.get("attribution"))
     text = copy["headline"].strip()
     if quote:
         text = "‘" + text.strip("\"'‘’“” ") + "’"
-    fn, lines = _fit(text, "pop_xb", W - 2 * M, 3, range(62, 40, -2))
-    lh = int(fn.size * 1.22)
-    head_top = 200
-    attr_h = 110 if quote else 0
-    text_end = head_top + len(lines) * lh + attr_h + 20
+    fn, lines = _fit(text, "inst", W - 2 * M, 3, range(96, 60, -2))
+    fi = F("inst_i", fn.size)
+    lh = int(fn.size * 1.04)
+    head_top = 190
+    attr_h = 100 if quote else 0
+    text_end = head_top + len(lines) * lh + attr_h
 
-    # background + photo
-    if hero and hero["kind"] in ("cutout", "photo"):
-        orig = hero.get("original") or hero["image"]
-        card = _soft_bg(orig, light)
-        _top_light(card, text_end + 160, light)
-        person = hero["image"].convert("RGBA")
-        if hero["kind"] == "photo":                     # no cut-out: fade the photo's top and sides
-            f = Image.new("L", person.size, 255)
-            fd = ImageDraw.Draw(f)
-            ew, eh = max(30, person.width // 6), max(60, person.height // 4)
-            for k in range(eh):
-                fd.line([(0, k), (person.width, k)], fill=int(255 * (k / eh) ** 1.5))
-            fx = Image.new("L", person.size, 255)
-            fxd = ImageDraw.Draw(fx)
-            for k in range(ew):
-                v = int(255 * (k / ew) ** 1.5)
-                fxd.line([(k, 0), (k, person.height)], fill=v)
-                fxd.line([(person.width - 1 - k, 0), (person.width - 1 - k, person.height)], fill=v)
-            person.putalpha(ImageChops.multiply(f, fx))
-        if person.getbbox():
-            person = person.crop(person.getbbox())
-        top = max(text_end - 30, int(H * 0.36))
-        scale = min((H - top) / person.height, (W * 1.05) / person.width)
-        person = person.resize((max(1, int(person.width * scale)), max(1, int(person.height * scale))), Image.LANCZOS)
-        card.alpha_composite(person, ((W - person.width) // 2, H - person.height))
-    elif hero:                                          # ai scene: full bleed, light top
-        card = ImageOps.fit(hero["image"].convert("RGB"), (W, H), Image.LANCZOS, centering=(0.5, 0.6)).convert("RGBA")
-        _top_light(card, text_end + 220, light)
-    else:
-        card = Image.new("RGBA", (W, H), light + (255,))
+    photo = None
+    if hero:
+        photo = (hero.get("original") or hero["image"]).convert("RGB")
+    light = _photo_light(photo) if photo is not None else (244, 245, 248)
+    card = Image.new("RGBA", (W, H), light + (255,))
+
+    if photo is not None:
+        # full real photo, natural background, anchored so the head sits just below the text
+        y0 = max(text_end - 120, int(H * 0.28))
+        scale = max(W / photo.width, (H - y0) / photo.height)
+        pw, ph = int(photo.width * scale), int(photo.height * scale)
+        ph_img = photo.resize((pw, ph), Image.LANCZOS)
+        x = (W - pw) // 2
+        if ph > H - y0:                                 # taller than the space: keep the top (head), crop bottom
+            ph_img = ph_img.crop((0, 0, pw, H - y0))
+            ph = H - y0
+        ph_img = ImageEnhance.Contrast(ph_img).enhance(1.04).convert("RGBA")
+        fade = Image.new("L", (pw, ph), 255)
+        fd = ImageDraw.Draw(fade)
+        fh = min(300, ph // 2)
+        for k in range(fh):
+            t = k / fh
+            fd.line([(0, k), (pw, k)], fill=int(255 * t * t * (3 - 2 * t)))
+        ph_img.putalpha(fade)
+        card.alpha_composite(ph_img, (x, H - ph))
 
     d = ImageDraw.Draw(card)
-    lg = bug(60, news_color=(17, 17, 22))
-    card.alpha_composite(lg, ((W - lg.width) // 2, 64))
+    lg = bug(62, news_color=ink)
+    card.alpha_composite(lg, ((W - lg.width) // 2, 62))
 
     y = head_top
-    for ln in lines:
-        d.text((W / 2, y + lh / 2), " ".join(ln), font=fn, fill=ink, anchor="mm")
+    hl = int(copy.get("highlight_words") or 0)
+    for ln, flags in _words_with_highlight(lines, hl):
         y += lh
+        _draw_mixed(d, 0, y - int(lh * 0.2), ln, flags, fn, fi, ink, ink, anchor_center=True)
+    y += 6
     if quote:
         name, _, role = copy["attribution"].partition(",")
-        af = F("kalam", 38)
-        d.text((W - M, y + 20), f"– {name.strip()}", font=af, fill=ink, anchor="ra")
+        af = F("kalam", 40)
+        d.text((W - M, y + 14), f"– {name.strip()}", font=af, fill=ink, anchor="ra")
         if role.strip():
-            d.text((W - M, y + 64), role.strip(), font=af, fill=ink, anchor="ra")
+            d.text((W - M, y + 58), role.strip(), font=af, fill=ink, anchor="ra")
     card.convert("RGB").save(out, "JPEG", quality=93, optimize=True)
     return out
