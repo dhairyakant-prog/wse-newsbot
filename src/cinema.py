@@ -448,9 +448,10 @@ def _soft_bg(img: Image.Image, light=(240, 242, 246)) -> Image.Image:
 def _top_light(card: Image.Image, until: int, light=(244, 245, 248)):
     g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(g)
-    solid = int(until * 0.72)
+    solid = int(until * 0.55)
     for y in range(until):
-        a = 238 if y < solid else int(238 * (1 - (y - solid) / (until - solid)) ** 1.4)
+        t = 0 if y < solid else (y - solid) / (until - solid)
+        a = int(238 * (1 - t * t * (3 - 2 * t)))           # smoothstep, no visible edge
         d.line([(0, y), (W, y)], fill=light + (a,))
     card.alpha_composite(g)
 

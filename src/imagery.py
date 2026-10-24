@@ -56,12 +56,33 @@ def wikimedia_person(name: str) -> tuple[Image.Image, str] | None:
     return (img, f"{artist or 'Wikimedia Commons'} / {lic}") if img else None
 
 
+def _main_subject(rgba: Image.Image) -> Image.Image:
+    """keep only the largest connected figure (drops bystanders the model half-cut)."""
+    try:
+        import numpy as np
+        from scipy import ndimage
+        a = np.array(rgba.split()[-1])
+        lab, n = ndimage.label(a > 40)
+        if n <= 1:
+            return rgba
+        sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
+        keep = 1 + int(np.argmax(sizes))
+        mask = ndimage.binary_dilation(lab == keep, iterations=3)
+        a = np.where(mask, a, 0).astype("uint8")
+        out = rgba.copy()
+        out.putalpha(Image.fromarray(a))
+        return out
+    except Exception:  # noqa: BLE001
+        return rgba
+
+
 def cutout(img: Image.Image) -> Image.Image | None:
     global _rembg
     try:
         from rembg import new_session, remove
         _rembg = _rembg or new_session("u2net_human_seg")
         out = remove(img, session=_rembg)
+        out = _main_subject(out)
         a = out.split()[-1]
         # reject bad cut-outs: almost nothing kept, or almost everything kept
         cover = sum(a.histogram()[128:]) / (a.width * a.height)
