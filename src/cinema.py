@@ -505,7 +505,7 @@ def _bw(img: Image.Image) -> Image.Image:
 def _place_photo(photo: Image.Image, cut: Image.Image | None, top: int, fade_top: int):
     """layout for the picture. the subject's head sits just under the text (never above `top`);
     a backdrop (same photo) covers the card from the fade down.
-    returns (bg_scale, bg_x, bg_y, blur_bg, fg_scale, fg_x, fg_y)."""
+    returns (bg_scale, bg_x, bg_y, blur_bg, fg_scale, fg_x, fg_y, feather_sides)."""
     pw0, ph0 = photo.size
     face = _face_box(photo, cut)
     if face:
@@ -534,13 +534,26 @@ def _place_photo(photo: Image.Image, cut: Image.Image | None, top: int, fade_top
     if blur:
         bg_y = min(bg_y, fade_top)
     if cut is None:
-        return bg, bg_x, bg_y, False, bg, bg_x, bg_y
+        return bg, bg_x, bg_y, False, bg, bg_x, bg_y, []
     fg = min(max(want, reach), 3.2)
+    # if the subject runs off the photo's left/right edge, that edge must sit on the card's edge
+    # (otherwise the crop shows as a cut arm or shoulder floating mid-card)
+    a = cut.split()[-1]
+    band = a.crop((0, int(ph0 * 0.3), pw0, ph0))
+    touch_l = band.crop((0, 0, 4, band.height)).getbbox() is not None
+    touch_r = band.crop((pw0 - 4, 0, pw0, band.height)).getbbox() is not None
     if not blur and fg >= bg * 0.8:                     # close enough: one aligned, sharp layer
-        return bg, bg_x, bg_y, False, bg, bg_x, bg_y
+        return bg, bg_x, bg_y, False, bg, bg_x, bg_y, []
     fg_x = int(W / 2 - head_cx * fg)
+    feather = []
+    if touch_l and touch_r:                              # tight portrait: fade the sides into the backdrop
+        feather = ["l", "r"]
+    elif touch_l:
+        fg_x = min(fg_x, 0)
+    elif touch_r:
+        fg_x = max(fg_x, W - int(pw0 * fg))
     fg_y = top - int(head_top * fg)
-    return bg, bg_x, bg_y, True, fg, fg_x, fg_y
+    return bg, bg_x, bg_y, True, fg, fg_x, fg_y, feather
 
 
 def _draw_bar_line(d, y_base, words, font, bar, ink_on_bar, lh):
@@ -578,7 +591,7 @@ def render_khabar(copy, cat, hero, inset, out: Path):
 
     if photo is not None:
         f_top, f_bot = max(0, text_end - 170), text_end + 90
-        bg_s, bg_x, bg_y, blur, fg_s, fg_x, fg_y = _place_photo(photo, cut, text_end + 26, f_top)
+        bg_s, bg_x, bg_y, blur, fg_s, fg_x, fg_y, feather = _place_photo(photo, cut, text_end + 26, f_top)
         bsize = (int(photo.width * bg_s), int(photo.height * bg_s))
         back = (_bw(photo) if cut is not None else photo).resize(bsize, Image.LANCZOS)
         if blur:                                           # subject on its own: soften the backdrop
@@ -596,6 +609,18 @@ def render_khabar(copy, cat, hero, inset, out: Path):
         if cut is not None:                                # the subject stays in colour
             fsize = (int(photo.width * fg_s), int(photo.height * fg_s))
             fg = ImageEnhance.Contrast(cut.resize(fsize, Image.LANCZOS)).enhance(1.05)
+            if feather:                                    # colour melts into the B/W backdrop at the crop
+                a = fg.split()[-1]
+                ramp = Image.new("L", fsize, 255)
+                rd = ImageDraw.Draw(ramp)
+                fw = int(fsize[0] * 0.16)
+                for k in range(fw):
+                    v = int(255 * k / fw)
+                    if "l" in feather:
+                        rd.line([(k, 0), (k, fsize[1])], fill=v)
+                    if "r" in feather:
+                        rd.line([(fsize[0] - 1 - k, 0), (fsize[0] - 1 - k, fsize[1])], fill=v)
+                fg.putalpha(ImageChops.multiply(a, ramp))
             card.alpha_composite(fg, (fg_x, fg_y))
         if inset is not None:
             dia = 300
