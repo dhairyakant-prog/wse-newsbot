@@ -457,68 +457,176 @@ def _top_light(card: Image.Image, until: int, light=(244, 245, 248)):
 
 
 def _photo_light(img: Image.Image) -> tuple:
-    """a soft light colour taken from the top of the photo, so the fade looks natural."""
+    """a near-white tint taken from the top of the photo, so the fade looks natural."""
     top = img.convert("RGB").resize((40, 40)).crop((0, 0, 40, 6))
     px = list(top.getdata())
     avg = tuple(sum(c[i] for c in px) // len(px) for i in range(3))
-    return tuple(int(avg[i] * 0.35 + 255 * 0.65) for i in range(3))
+    return tuple(int(avg[i] * 0.18 + 255 * 0.82) for i in range(3))
+
+
+_CASCADE = None
+
+
+def _face_box(img: Image.Image, mask: Image.Image | None = None):
+    """largest frontal face as (x, y, w, h) in image pixels, or None."""
+    global _CASCADE
+    try:
+        import cv2
+        import numpy as np
+        if _CASCADE is None:
+            _CASCADE = cv2.CascadeClassifier(str(ROOT / "assets" / "haarcascade_frontalface_default.xml"))
+        small = img.convert("RGB")
+        k = 1.0
+        if small.width > 1400:
+            k = 1400 / small.width
+            small = small.resize((1400, int(small.height * k)), Image.LANCZOS)
+        g = cv2.cvtColor(np.array(small), cv2.COLOR_RGB2GRAY)
+        g = cv2.equalizeHist(g)
+        faces = _CASCADE.detectMultiScale(g, 1.1, 5, minSize=(int(small.width * 0.07),) * 2)
+        found = [(int(x / k), int(y / k), int(w / k), int(h / k)) for x, y, w, h in faces]
+        if mask is not None:                            # only faces that belong to the cut-out subject
+            a = mask.split()[-1]
+            found = [f for f in found if a.getpixel((min(a.width - 1, f[0] + f[2] // 2),
+                                                     min(a.height - 1, f[1] + f[3] // 2))) > 128]
+        if not found:
+            return None
+        return max(found, key=lambda f: f[2] * f[3])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _bw(img: Image.Image) -> Image.Image:
+    g = ImageOps.grayscale(img.convert("RGB"))
+    g = ImageOps.autocontrast(g, cutoff=1)
+    g = ImageEnhance.Brightness(g).enhance(0.92)
+    return g.convert("RGB")
+
+
+def _place_photo(photo: Image.Image, cut: Image.Image | None, top: int, fade_top: int):
+    """layout for the picture. the subject's head sits just under the text (never above `top`);
+    a backdrop (same photo) covers the card from the fade down.
+    returns (bg_scale, bg_x, bg_y, blur_bg, fg_scale, fg_x, fg_y)."""
+    pw0, ph0 = photo.size
+    face = _face_box(photo, cut)
+    if face:
+        fx, fy, fw, fh = face
+        head_top = max(0, fy - int(fh * 0.55))          # hair sits above the detected box
+        head_cx = fx + fw / 2
+        want = 230 / fh
+    elif cut is not None and cut.split()[-1].getbbox():
+        bb = cut.split()[-1].getbbox()
+        head_top, head_cx = bb[1], (bb[0] + bb[2]) / 2
+        want = (H - top) / max(1, ph0 - bb[1]) * 0.95
+    else:
+        head_top, head_cx, want = int(ph0 * 0.10), pw0 / 2, 0
+    reach = (H - top) / max(1, ph0 - head_top)          # head at `top`, photo reaches the bottom
+    # backdrop: cover the width, reach the bottom, and (if the photo has room above the head)
+    # also cover the fade band above the text
+    base = max(W / pw0, reach)
+    need = (top - fade_top) / head_top if head_top > 0 else 9.9
+    blur = False
+    if need <= base * 1.15 and need <= 3.2:
+        bg = max(base, need)
+    else:                                               # would need a big zoom: abstract backdrop instead
+        bg, blur = min(max(base, (H - fade_top) / ph0), 3.2), True
+    bg_x = max(min(int(W / 2 - head_cx * bg), 0), W - int(pw0 * bg))
+    bg_y = max(top - int(head_top * bg), H - int(ph0 * bg))
+    if blur:
+        bg_y = min(bg_y, fade_top)
+    if cut is None:
+        return bg, bg_x, bg_y, False, bg, bg_x, bg_y
+    fg = min(max(want, reach), 3.2)
+    if not blur and fg >= bg * 0.8:                     # close enough: one aligned, sharp layer
+        return bg, bg_x, bg_y, False, bg, bg_x, bg_y
+    fg_x = int(W / 2 - head_cx * fg)
+    fg_y = top - int(head_top * fg)
+    return bg, bg_x, bg_y, True, fg, fg_x, fg_y
+
+
+def _draw_bar_line(d, y_base, words, font, bar, ink_on_bar, lh):
+    text = " ".join(words)
+    tw = font.getlength(text)
+    pad = int(font.size * 0.22)
+    x0 = (W - tw) / 2
+    d.rectangle([x0 - pad, y_base - lh * 0.86, x0 + tw + pad, y_base + lh * 0.18], fill=bar)
+    d.text((x0, y_base), text, font=font, fill=ink_on_bar, anchor="ls")
 
 
 def render_khabar(copy, cat, hero, inset, out: Path):
     ink = (17, 17, 22)
+    bar = (24, 86, 232)                      # one strong accent, white type on it
     M = 64
     quote = bool(copy.get("attribution"))
     text = copy["headline"].strip()
     if quote:
         text = "‘" + text.strip("\"'‘’“” ") + "’"
-    fn, lines = _fit(text, "inst", W - 2 * M, 3, range(96, 60, -2))
-    fi = F("inst_i", fn.size)
-    lh = int(fn.size * 1.04)
-    head_top = 190
-    attr_h = 100 if quote else 0
-    text_end = head_top + len(lines) * lh + attr_h
+    fn, lines = _fit(text, "inst", W - 2 * M - 40, 4, range(92, 56, -2))
+    lh = int(fn.size * 1.1)
+    head_top = 176
+    attr_h = 54 if quote else 0
+    text_end = head_top + len(lines) * lh + attr_h + 10
 
-    photo = None
+    photo = cut = None
     if hero:
         photo = (hero.get("original") or hero["image"]).convert("RGB")
-    light = _photo_light(photo) if photo is not None else (244, 245, 248)
+        if hero.get("kind") == "cutout":
+            cut = hero["image"].convert("RGBA")
+            if cut.size != photo.size:
+                cut = None
+    light = _photo_light(photo) if photo is not None else (246, 247, 250)
     card = Image.new("RGBA", (W, H), light + (255,))
 
     if photo is not None:
-        # full real photo, natural background, anchored so the head sits just below the text
-        y0 = max(text_end - 120, int(H * 0.28))
-        scale = max(W / photo.width, (H - y0) / photo.height)
-        pw, ph = int(photo.width * scale), int(photo.height * scale)
-        ph_img = photo.resize((pw, ph), Image.LANCZOS)
-        x = (W - pw) // 2
-        if ph > H - y0:                                 # taller than the space: keep the top (head), crop bottom
-            ph_img = ph_img.crop((0, 0, pw, H - y0))
-            ph = H - y0
-        ph_img = ImageEnhance.Contrast(ph_img).enhance(1.04).convert("RGBA")
-        fade = Image.new("L", (pw, ph), 255)
-        fd = ImageDraw.Draw(fade)
-        fh = min(300, ph // 2)
-        for k in range(fh):
-            t = k / fh
-            fd.line([(0, k), (pw, k)], fill=int(255 * t * t * (3 - 2 * t)))
-        ph_img.putalpha(fade)
-        card.alpha_composite(ph_img, (x, H - ph))
+        f_top, f_bot = max(0, text_end - 170), text_end + 90
+        bg_s, bg_x, bg_y, blur, fg_s, fg_x, fg_y = _place_photo(photo, cut, text_end + 26, f_top)
+        bsize = (int(photo.width * bg_s), int(photo.height * bg_s))
+        back = (_bw(photo) if cut is not None else photo).resize(bsize, Image.LANCZOS)
+        if blur:                                           # subject on its own: soften the backdrop
+            back = ImageEnhance.Brightness(back.filter(ImageFilter.GaussianBlur(28))).enhance(0.9)
+        back = ImageEnhance.Contrast(back).enhance(1.04).convert("RGBA")
+        card.alpha_composite(back, (bg_x, bg_y))
+        # fade the background into the light top so the headline sits on clean ground
+        g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(g)
+        gd.rectangle([0, 0, W, f_top], fill=light + (255,))
+        for k in range(f_top, f_bot):
+            t = (k - f_top) / max(1, f_bot - f_top)
+            gd.line([(0, k), (W, k)], fill=light + (int(255 * (1 - t * t * (3 - 2 * t))),))
+        card.alpha_composite(g)
+        if cut is not None:                                # the subject stays in colour
+            fsize = (int(photo.width * fg_s), int(photo.height * fg_s))
+            fg = ImageEnhance.Contrast(cut.resize(fsize, Image.LANCZOS)).enhance(1.05)
+            card.alpha_composite(fg, (fg_x, fg_y))
+        if inset is not None:
+            dia = 300
+            c = _circle(inset, dia, 9)
+            cx = 56 if (fg_x + (photo.width * fg_s) / 2) > W / 2 else W - 56 - c.width
+            card.alpha_composite(c, (cx, text_end + 60))
 
     d = ImageDraw.Draw(card)
-    lg = bug(62, news_color=ink)
-    card.alpha_composite(lg, ((W - lg.width) // 2, 62))
+    lg = bug(58, news_color=ink)
+    card.alpha_composite(lg, ((W - lg.width) // 2, 60))
 
-    y = head_top
+    # first line(s) on the accent bar — whole lines, like the reference; the rest in ink
     hl = int(copy.get("highlight_words") or 0)
-    for ln, flags in _words_with_highlight(lines, hl):
+    n_bar, seen = 1, 0
+    for i, ln in enumerate(lines):
+        seen += len(ln)
+        if seen >= hl:
+            n_bar = i + 1
+            break
+    n_bar = max(1, min(n_bar, 2, max(1, len(lines) - 1)))
+    y = head_top
+    for i, ln in enumerate(lines):
         y += lh
-        _draw_mixed(d, 0, y - int(lh * 0.2), ln, flags, fn, fi, ink, ink, anchor_center=True)
-    y += 6
+        if i < n_bar:
+            _draw_bar_line(d, y - int(lh * 0.2), ln, fn, bar, (255, 255, 255), lh)
+        else:
+            d.text((W / 2, y - int(lh * 0.2)), " ".join(ln), font=fn, fill=ink, anchor="ms")
     if quote:
         name, _, role = copy["attribution"].partition(",")
-        af = F("kalam", 40)
-        d.text((W - M, y + 14), f"– {name.strip()}", font=af, fill=ink, anchor="ra")
-        if role.strip():
-            d.text((W - M, y + 58), role.strip(), font=af, fill=ink, anchor="ra")
+        af = F("semi", 28)
+        who = f"— {name.strip()}" + (f", {role.strip()}" if role.strip() else "")
+        d.text((W - M, y + 22), who, font=af, fill=(70, 70, 78), anchor="ra")
     card.convert("RGB").save(out, "JPEG", quality=93, optimize=True)
     return out

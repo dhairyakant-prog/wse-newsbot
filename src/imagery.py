@@ -37,9 +37,9 @@ def wikimedia_person(name: str) -> tuple[Image.Image, str] | None:
         return None
     r = requests.get("https://en.wikipedia.org/w/api.php", headers=UA, timeout=20, params={
         "action": "query", "format": "json", "redirects": 1, "prop": "pageimages",
-        "piprop": "original|name", "titles": name}).json()
+        "piprop": "thumbnail|name", "pithumbsize": 1600, "titles": name}).json()
     page = next(iter(r.get("query", {}).get("pages", {}).values()), {})
-    fname, src = page.get("pageimage"), page.get("original", {}).get("source")
+    fname, src = page.get("pageimage"), page.get("thumbnail", {}).get("source")
     if not (fname and src):
         return None
     meta = requests.get("https://commons.wikimedia.org/w/api.php", headers=UA, timeout=20, params={
@@ -148,17 +148,24 @@ def build(brief: dict, style: str = "photo") -> dict:
         prompt = _scrub(brief["scene_prompt"], names)
         prompt += (". candid editorial photograph of a fictional, non-identifiable ordinary person,"
                    " face clearly visible and expressive")
-        if CFG.get("card", {}).get("layout") in ("cinema", "cinema_bottom", "poster", "khabar"):
+        if CFG.get("card", {}).get("layout") in ("cinema", "cinema_bottom", "poster"):
             prompt += (". person in the lower half of the frame; upper half is calm sky,"
                        " wall or soft background as negative space")
+        else:
+            prompt += (". one continuous frame, medium shot from the waist up, eye level,"
+                       " natural headroom, real location behind the person")
         img = higgsfield.generate(prompt, "4:5")
         if img:
-            res.update(hero={"kind": "scene", "image": img}, source="higgsfield")
+            cut = cutout(img)
+            if cut is not None:
+                res.update(hero={"kind": "cutout", "image": cut, "original": img}, source="higgsfield")
+            else:
+                res.update(hero={"kind": "scene", "image": img, "original": img}, source="higgsfield")
             res["credits"].append("visual: AI-generated")
         else:
             got = stock(brief.get("stock_query") or "")
             if got:
-                res.update(hero={"kind": "scene", "image": got[0]}, source="stock")
+                res.update(hero={"kind": "scene", "image": got[0], "original": got[0]}, source="stock")
                 res["credits"].append(f"photo: {got[1]}")
 
     if CFG.get("card", {}).get("inset", False) and res["hero"] is not None and brief.get("inset_prompt"):

@@ -21,7 +21,7 @@ OUT.mkdir(exist_ok=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("newsbot")
 
-UA = {"User-Agent": "Mozilla/5.0 (newsbot; +https://instagram.com)"}
+UA = {"User-Agent": "WSENewsBot/1.0 (https://www.facebook.com/wsenews; dhairyakant@theideazfactory.com)"}
 
 
 # ── config ────────────────────────────────────────────────────
