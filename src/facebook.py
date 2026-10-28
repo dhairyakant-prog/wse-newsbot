@@ -43,6 +43,8 @@ def page_token() -> str:
     global _page_tok
     if not _page_tok:
         _page_tok = _get(_page(), _sys_tok(), fields="access_token")["access_token"]
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(f"::add-mask::{_page_tok}", flush=True)   # repo is public: keep it out of the logs
     return _page_tok
 
 

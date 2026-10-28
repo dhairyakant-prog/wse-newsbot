@@ -21,8 +21,12 @@ def current_slot(force: bool) -> str | None:
     slots = CFG["posting"]["slots"]
     t = now_local()
     mins = t.hour * 60 + t.minute
-    best = min(slots, key=lambda s: abs(int(s[:2]) * 60 + int(s[3:]) - mins))
-    if force or abs(int(best[:2]) * 60 + int(best[3:]) - mins) <= 50:   # github cron can start late
+    def dist(s):                                   # minutes apart on a 24h clock (handles midnight)
+        d = abs(int(s[:2]) * 60 + int(s[3:]) - mins)
+        return min(d, 1440 - d)
+    best = min(slots, key=dist)
+    tol = CFG["posting"].get("slot_tolerance_minutes", 50)
+    if force or dist(best) <= tol:                 # github cron can start late
         return best
     return None
 
