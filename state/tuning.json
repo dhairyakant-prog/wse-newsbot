@@ -8,7 +8,8 @@
     "entertainment": 1.0,
     "sports": 1.0,
     "science": 1.0,
-    "health": 1.0
+    "health": 1.0,
+    "human_interest": 1.0
   },
   "region_mix": {
     "us": 0.45,
@@ -28,7 +29,7 @@
   "copy_guidance": [],
   "hashtag_blocklist": [],
   "hashtag_boost": [],
-  "headline_max_words": 14,
+  "headline_max_words": 16,
   "image_style": "photo",
   "updated_at": "2026-10-24T03:13:42.557235+00:00",
   "last_review": "2026-10-24T03:13:42.557222+00:00"

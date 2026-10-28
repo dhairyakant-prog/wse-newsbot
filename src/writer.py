@@ -5,11 +5,12 @@ import json
 
 from .common import llm_json, load_tuning
 
-SYSTEM = """You write for a clean, calm social news page (WSE News). Voice: plain, direct, factual,
-no hype words (no "shocking", "breaking", "you won't believe", no emojis on the card).
-Short sentences. Every fact you write must appear in the source material given to you —
-never add numbers, names, quotes or causes that aren't there. If sources disagree, use the
-cautious version. Neutral on politics: describe what happened, not who is right."""
+SYSTEM = """You write for WSE News, a Facebook card-news page in the style of India's biggest card pages
+(like Jist): people-led, plain, direct, factual. No hype words ("shocking", "breaking", "you won't
+believe"), no emojis on the card. Every fact you write must appear in the source material given to
+you — never add numbers, names, quotes or causes that aren't there. If sources disagree, use the
+cautious version. Neutral on politics: describe what happened, not who is right. Attribute claims:
+"X says", "X claims", "a viral post shows" — never state an unverified claim as fact."""
 
 PROMPT = """Write the post for this story. Cover ONLY this one story — the outlet material may include
 unrelated headlines from the same feed; ignore anything not about this exact event.
@@ -22,42 +23,44 @@ TRENDING SEARCH (if any): {trend}
 HOUSE RULES LEARNED FROM PAST PERFORMANCE:
 {guidance}
 
-The card is a serif headline, centred, with its opening words on a highlight bar,
-then a short explainer underneath, over a photo. Write in English.
+The card is a full-bleed photo of the person with the headline at the bottom in 3 short lines,
+each on its own box; the middle line (the hook) is on a red box. Write in English.
+
+HEADLINE PATTERN (copy this exactly in spirit):
+- lead with the person: "Name Says / Recalls / Reveals / Admits / Claims / Shares / Calls / Slams..."
+  e.g. "Keerthy Suresh Says She Was Told To Avoid OTT As A Theatrical Star"
+       "Puneet Issar Says He Lost Work For 6 Years After Amitabh Bachchan's Accident"
+       "Delhi Man, 34, Says He Earns ₹80,000 A Month But Has No Savings"
+       "Developer Says New Job Brings A PIP Within The First Month"
+       "Prominent MAGA Voices Question Their Trump Support As Divisions Surface"
+- for an ordinary person: describe them ("Texas Nurse", "London Commuter, 29", "Woman In Viral TikTok")
+- the surprising detail (number, twist, admission) goes in the middle of the sentence
+- 10-16 words, one sentence, no full stop, no quote marks, digits for numbers
 
 Return JSON:
 {{
- "headline": "the ONLY text on the card. 7-14 words, never longer. if a named person said something
-              notable and their exact words are in the material above, use that quote (without
-              quote marks — the card adds them) and fill attribution. otherwise one plain, punchy
-              statement of the news. one or two plain sentences that carry the whole news.
-              if a named person said something notable AND their exact words appear in the material
-              above, you may use it as a quote in double quotes; otherwise never use quote marks.",
- "explainer": "2 sentences, 25-40 words, printed under the headline. add what the headline does NOT
-               say: background, why it matters, or what happens next. never repeat a fact, number,
-               name or date already in the headline. flowing sentences, not a list of fragments.
-               only facts from the material above.",
- "highlight_words": "integer — how many opening words go on the highlight bar (the hook — usually 2-5 words; they get the accent colour)",
- "attribution": "for a quote: 'Name, role' (e.g. 'Emmanuel Macron, President of France'); else null",
- "caption": "3-5 short lines. line 1 restates the news. then 2-3 lines of context.
-             last line a genuine question to invite comments. no hashtags. at most one emoji.",
- "hashtags": ["8-12 tags without #: 2 broad, 4-6 topic-specific, 2-3 long-tail. no party tags"],
+ "headline": "follows the pattern above",
+ "highlight_words": "integer — the hook: count words from the start of the headline up to the END of
+                     the surprising detail (it is printed on the red box)",
+ "attribution": null,
+ "explainer": "1 sentence of background (not printed on the card; used for alt text)",
+ "caption": "exactly 3 short sentences, a plain factual summary: who, what was said or happened, and
+             one line of context or what's next. no question, no emojis, no hashtags.",
+ "hashtags": ["exactly 5 tags without #: the person's name, the show/team/company/place, the topic,
+              and one broad tag like EntertainmentNews, SportsNews, ViralNews or WorldNews. no party tags"],
  "alt_text": "one sentence describing the card for screen readers",
  "image": {{
-   "subject_type": "person whenever ANY named public figure appears in the material above (the subject,
-                    the official who announced it, the minister/CEO/mayor/leader responsible, the athlete,
-                    the person quoted). scene only if no named public figure is mentioned at all.",
+   "subject_type": "person whenever ANY named public figure appears in the material above.
+                    scene only if no named public figure is mentioned at all.",
    "person_name": "the single most relevant named public figure, as their exact Wikipedia article title.
                    must be named in the material above — never guess who is involved. null if none.",
-   "scene_prompt": "a photo prompt used when there is no person (or the photo is unavailable). it MUST
-                    feature an anonymous ordinary person with their face clearly visible, close or
-                    medium shot, reacting to or living the story — e.g. 'a young couple outside a
-                    suburban house with a for-sale sign, looking hopeful', 'a commuter on a Paris
-                    bike lane, morning light'. the person is fictional and generic: NEVER a real,
-                    named or identifiable person, no politicians, no celebrities, no uniforms that
-                    imply a specific real official. no text in image.",
-   "inset_prompt": "a photo prompt for the small context circle: one object or place that explains the
-                    story at a glance (e.g. 'a petrol pump price board in a European town'). same rules.",
+   "scene_prompt": "a photo prompt used when there is no named person: an anonymous ordinary person who
+                    matches the story (age, job, setting), face clearly visible, close or medium shot,
+                    mid-moment — e.g. 'a tired software developer in his 30s at a desk at night, laptop
+                    glow', 'a young woman at an airport gate looking at her phone'. fictional and generic:
+                    NEVER a real, named or identifiable person, no uniforms implying a real official,
+                    no text in image.",
+   "inset_prompt": "one object or place that explains the story at a glance. same rules.",
    "stock_query": "2-4 word stock-photo search as last resort"
  }}
 }}"""
@@ -86,17 +89,17 @@ def write(story: dict) -> dict:
 
 
 def compose_caption(copy: dict, story: dict, credits: list[str]) -> str:
-    srcs = ", ".join(story["outlets"][:3])
-    parts = [copy["caption"].strip(), "", f"source: {srcs}", *credits]
+    srcs = ", ".join(story["outlets"][:2])
+    parts = [copy["caption"].strip(), "", f"via {srcs}" + (" · " + " · ".join(credits) if credits else "")]
     parts += ["", " ".join("#" + h for h in copy["hashtags"])]
     cap = "\n".join(parts)
     return cap[:2150]   # instagram caption limit is 2,200 chars
 
 
 def facebook_caption(caption: str, copy: dict) -> str:
-    """facebook: same text, hashtags trimmed to the 3 most specific ones."""
+    """facebook: summary + credit line, then the 5 hashtags (jist pattern)."""
     body = caption.split("\n\n#")[0]
-    tags = copy.get("hashtags", [])[2:5]
+    tags = copy.get("hashtags", [])[:5]
     return body + ("\n\n" + " ".join("#" + t for t in tags) if tags else "")
 
 

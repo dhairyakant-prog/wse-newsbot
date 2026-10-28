@@ -8,9 +8,13 @@ from rapidfuzz import fuzz
 
 from .common import CFG, db, hours_ago, llm_json, load_tuning, log, now
 
-SYSTEM = """You are the news editor of a fast-growing English Instagram news page covering
-the United States, Europe and the Middle East, for readers in those regions. You judge which stories will travel on Instagram, and you are
-strict about safety and accuracy. You never reward outrage-bait or rumours."""
+SYSTEM = """You are the editor of WSE News, a fast-growing English Facebook news page covering the
+United States, Europe and the Middle East. The page follows the format of India's biggest card-news
+pages (like Jist): mostly people-led stories — a celebrity, athlete or public figure who says, recalls,
+reveals or does something; viral human-interest stories (a worker, a traveller, a couple, a family,
+someone's post that went viral about money, jobs, dating, travel, food); and a smaller share of the
+biggest hard news. You judge which stories make people stop scrolling, and you are strict about safety
+and accuracy. You never reward rumours, gossip without an on-record source, or outrage-bait."""
 
 PROMPT = """Score each story below. For each, return an object:
 {{
@@ -18,20 +22,25 @@ PROMPT = """Score each story below. For each, return an object:
  "region": where the story happens or mainly matters: us | europe | middle_east | other
             (europe includes the UK; middle_east = gulf states, levant, iran, iraq, turkey, egypt.
              india, asia, africa, latin america etc. = other),
- "category": one of [us, europe, middle_east, business, technology, entertainment, sports, science, health]
-             (use the region name for politics/general news, a topic name when the topic is the point),
- "virality": 0-10  (would an 18-40 instagram user in the US, Europe or the Middle East stop, share
-                    or save this? weigh: surprise, relevance to daily life, emotional pull,
-                    conversation value, visual potential, celebrity, money impact),
+ "category": one of [entertainment, sports, human_interest, us, europe, middle_east, business, technology,
+             science, health]. entertainment = film/tv/music/celebrity; sports = athletes/teams;
+             human_interest = an ordinary person's story, a viral post or video, workplace/money/dating/
+             travel/food stories, quirky real-life moments; region name = politics/general hard news,
+ "virality": 0-10  (would a 18-45 facebook user in the US, Europe or the Middle East stop, react, comment
+                    or share? highest for: a famous face saying or revealing something personal or
+                    surprising, a relatable everyday story (salary, boss, rent, dating, travel mishap),
+                    a viral moment, a big-name feud or tribute, money numbers people talk about.
+                    lower for: dry policy, process news, markets, diplomacy without a human angle),
  "why": "<=15 words",
  "risk": 0-10  (defamation, graphic content, unverified claims, sectarian tension, privacy,
                 prejudicing a trial. straight factual reporting of a conflict that major outlets
                 confirm is NOT high risk by itself),
  "blocked_theme": null or the matching theme from this list: {blocked},
  "is_confirmed_fact": true/false — true if major outlets report it as fact, OR it is an on-record
-                      statement, official figure, court ruling, market move, or a named study/report
-                      (attributed). false only for rumours, anonymous leaks, unverified claims, speculation,
-                      or opinion pieces,
+                      statement or interview quote, official figure, court ruling, market move, a named
+                      study/report, or a viral post/video that outlets report as such (attributed:
+                      "a woman said in a viral TikTok..."). false only for rumours, anonymous leaks,
+                      "sources say" gossip, unverified claims, speculation, or opinion pieces,
  "evergreen_minutes": how long this stays postable, estimate in minutes,
  "has_face": true if a named public figure is central to the story (subject, announcer, quoted)
 }}
@@ -114,6 +123,14 @@ def score(stories: list[dict]) -> list[dict]:
     return out
 
 
+def _fmt(category: str | None) -> str:
+    if category in ("entertainment", "sports"):
+        return "celebrity"
+    if category == "human_interest":
+        return "human_interest"
+    return "news"
+
+
 def pick(scored: list[dict]) -> dict | None:
     t = load_tuning()
     ok = [s for s in scored if not s["reject_reason"]]
@@ -132,7 +149,18 @@ def pick(scored: list[dict]) -> dict | None:
         for s in ok:
             if lagging in s["regions"]:
                 s["final"] *= 1.10
-        ok.sort(key=lambda s: s["final"], reverse=True)
+    # format balance (jist pattern): celebrity / human-interest / hard news
+    fmix = CFG.get("format_mix")
+    cats = [r["category"] for r in con.execute(
+        "select category from posts where created_at > ? and status in ('posted','dry_run')",
+        (hours_ago(24).isoformat(),))]
+    if fmix:
+        done = [_fmt(c) for c in cats]
+        n = max(1, len(done))
+        gap = {f: fmix[f] - done.count(f) / n for f in fmix}
+        for s in ok:
+            s["final"] *= 1 + max(0.0, gap.get(_fmt(s.get("category")), 0)) * 0.8
+    ok.sort(key=lambda s: s["final"], reverse=True)
 
     explore = random.random() < CFG["analyst"]["exploration_share"]
     if explore and len(ok) > 2:

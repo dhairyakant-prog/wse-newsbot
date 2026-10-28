@@ -18,6 +18,8 @@ llm:
   model: "claude-sonnet-5-5"
   max_tokens: 2000
 
+format_mix: { celebrity: 0.55, human_interest: 0.30, news: 0.15 }   # jist pattern; pick() nudges toward the lagging one
+
 coverage:
   # only these regions are ever posted. anything else is dropped at scoring.
   regions: ["us", "europe", "middle_east"]
@@ -41,9 +43,17 @@ discovery:
   topics: ["WORLD", "NATION", "BUSINESS", "TECHNOLOGY", "ENTERTAINMENT", "SPORTS", "SCIENCE", "HEALTH"]
   # google news searches, last 24h, per region (fills gaps the editions miss)
   searches:
-    europe: ["European Union", "Germany", "France", "Ukraine", "Italy OR Spain", "NATO"]
+    # jist-style mix: celebrity & entertainment ~55%, viral human-interest ~30%, hard news ~15%
+    us: ["actor says", "actress reveals", "singer recalls", "Hollywood star", "Netflix series star",
+         "Taylor Swift OR Beyonce OR Kardashian", "NFL OR NBA star says", "went viral",
+         "viral video", "Reddit post viral", "TikTok user", "employee says boss",
+         "woman says she", "man says he", "salary OR paycheck viral", "dating story viral"]
+    europe: ["European Union", "Germany", "France", "Ukraine", "Italy OR Spain", "NATO",
+             "Royal family", "Premier League star", "UK actor says", "UK viral",
+             "British woman says", "Champions League star"]
     middle_east: ["Middle East", "Israel", "Iran", "Saudi Arabia", "UAE OR Dubai OR Qatar",
-                  "Gaza OR Lebanon OR Syria", "Turkey Erdogan", "Egypt"]
+                  "Gaza OR Lebanon OR Syria", "Turkey Erdogan", "Egypt",
+                  "Dubai viral", "Riyadh Season OR Saudi concert", "Cristiano Ronaldo Al Nassr"]
   reddit_subs: []                 # reddit blocks github servers; left off
   trends_geo: ["US", "GB", "DE", "AE", "SA"]
   min_independent_sources: 2     # story must be carried by ≥ N different outlets
@@ -84,7 +94,7 @@ higgsfield:
 
 card:
   inset: false                   # context circle on the image — off (also saves one higgsfield image per post)
-  layout: "khabar"               # khabar | cinema | cinema_bottom | poster | glass | stack | framed | split
+  layout: "jist"                 # jist | khabar | cinema | cinema_bottom | poster | glass | stack | framed | split
 
 hosting:
   provider: "cloudinary"         # only used when platform is instagram

@@ -370,7 +370,7 @@ def _render_split(copy, category, hero, inset, out_path):
 from . import cinema  # noqa: E402
 
 LAYOUTS = {"stack": _render_stack, "framed": _render_framed, "split": _render_split,
-           "khabar": cinema.render_khabar, "cinema": cinema.render_cinema, "cinema_bottom": cinema.render_cinema_bottom, "poster": cinema.render_poster, "glass": cinema.render_glass}
+           "khabar": cinema.render_khabar, "cinema": cinema.render_cinema, "cinema_bottom": cinema.render_cinema_bottom, "poster": cinema.render_poster, "glass": cinema.render_glass, "jist": cinema.render_jist}
 
 
 def render(copy: dict, category: str, hero: dict | None, inset: Image.Image | None,

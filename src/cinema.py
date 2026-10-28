@@ -655,3 +655,90 @@ def render_khabar(copy, cat, hero, inset, out: Path):
         d.text((W - M, y + 22), who, font=af, fill=(70, 70, 78), anchor="ra")
     card.convert("RGB").save(out, "JPEG", quality=93, optimize=True)
     return out
+
+
+# ── layout: jist ──────────────────────────────────────────────
+def _title_case(text: str) -> str:
+    return " ".join(w[:1].upper() + w[1:] if w[:1].isalpha() else w for w in text.split())
+
+
+def render_jist(copy, cat, hero, inset, out: Path):
+    """full-bleed face photo, logo top-left, 3-4 line title-case headline at the bottom on
+    white boxes with the hook line on a red box, over a dark fade."""
+    red, white, black = (226, 27, 35), (255, 255, 255), (10, 10, 12)
+    if hero:
+        img = (hero.get("original") or hero["image"]).convert("RGB")
+        fb = _face_box(img, hero["image"] if hero.get("kind") == "cutout" else None)
+        cover = max(W / img.width, H / img.height)
+        if fb:
+            # zoom so the face is ~300px tall and its centre lands at 36% of the card height
+            sc = max(cover, min(300 / fb[3], 2.6))
+            below = img.height - (fb[1] + fb[3] / 2)       # photo below the face centre
+            sc = min(max(sc, H * 0.54 / max(1, below)), 2.6)  # zoom until the face can sit above the text
+            fcx, fcy = (fb[0] + fb[2] / 2) * sc, (fb[1] + fb[3] / 2) * sc
+            x0 = int(min(max(fcx - W / 2, 0), img.width * sc - W))
+            y0 = int(min(max(fcy - H * 0.36, 0), img.height * sc - H))
+        else:
+            sc = cover
+            x0 = int((img.width * sc - W) / 2)
+            y0 = int((img.height * sc - H) * 0.3)
+        big = img.resize((max(W, int(img.width * sc)), max(H, int(img.height * sc))), Image.LANCZOS)
+        card = big.crop((x0, y0, x0 + W, y0 + H))
+        card = ImageEnhance.Contrast(card).enhance(1.05).convert("RGBA")
+    else:
+        card = Image.new("RGBA", (W, H), (28, 28, 34, 255))
+
+    text = _title_case(copy["headline"].strip().strip("\"'‘’“” "))
+    words = text.split()
+    width = W - 120
+    for size in range(84, 46, -2):
+        f = F("pop_xb", size)
+        lines = _balanced(words, f, width)
+        if len(lines) <= 4:
+            break
+    lh = int(f.size * 1.24)
+    block = len(lines) * lh
+    y = H - 64 - block
+
+    g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(g)
+    g0 = max(int(H * 0.42), y - 260)
+    for k in range(g0, H):
+        t = min(1.0, (k - g0) / max(1, (y + 40) - g0))
+        gd.line([(0, k), (W, k)], fill=(0, 0, 0, int(240 * t * t * (3 - 2 * t))))
+    card.alpha_composite(g)
+
+    # hook line in red: the line holding the end of the hook, never the first of 3+
+    hl = int(copy.get("highlight_words") or 0)
+    red_i, seen = 1, 0
+    if hl:
+        for i, ln in enumerate(lines):
+            seen += len(ln)
+            if seen >= hl:
+                red_i = i
+                break
+    if len(lines) >= 3:
+        red_i = min(max(red_i, 1), len(lines) - 2)
+    else:
+        red_i = min(red_i, len(lines) - 1)
+
+    d = ImageDraw.Draw(card)
+    pad = int(f.size * 0.2)
+    for i, ln in enumerate(lines):
+        t = " ".join(ln)
+        tw = f.getlength(t)
+        x0 = (W - tw) / 2
+        box = red if i == red_i else white
+        d.rectangle([x0 - pad, y + 2, x0 + tw + pad, y + lh - 4], fill=box)
+        d.text((W / 2, y + (lh - 2) / 2 + 1), t, font=f, fill=white if i == red_i else black, anchor="mm")
+        y += lh
+
+    top = Image.new("RGBA", (W, 220), (0, 0, 0, 0))
+    td = ImageDraw.Draw(top)
+    for k in range(220):
+        td.line([(0, k), (W, k)], fill=(0, 0, 0, int(110 * (1 - k / 220) ** 2)))
+    card.alpha_composite(top, (0, 0))
+    lg = bug(58)
+    card.alpha_composite(lg, (48, 48))
+    card.convert("RGB").save(out, "JPEG", quality=93, optimize=True)
+    return out
