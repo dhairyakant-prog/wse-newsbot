@@ -3,7 +3,7 @@ name: newsbot
 on:
   schedule:
     # a post every 20 minutes (UTC) — matches config.yaml posting.slots
-    - cron: "4,24,44 * * * *"     # off the top of the hour, when github cron is least congested
+    - cron: "4,24,44 * * * *"     # each run posts up to 3 times, 20 min apart; overlapping fires just queue
     # analyst check (runs only when 72h have passed since the last review)
     - cron: "47 2 * * *"
   workflow_dispatch:
@@ -23,7 +23,7 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 75
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -61,9 +61,24 @@ jobs:
           elif [ "${{ github.event.schedule }}" = "47 2 * * *" ]; then echo "t=analyze" >> $GITHUB_OUTPUT;
           else echo "t=post" >> $GITHUB_OUTPUT; fi
 
-      - name: post
+      - name: post (scheduled runs stay alive ~1h and post every 20 min; github drops many cron fires)
         if: steps.task.outputs.t == 'post'
-        run: python main.py post ${{ github.event_name == 'workflow_dispatch' && '--now' || '' }}
+        run: |
+          git config user.name "newsbot"
+          git config user.email "newsbot@users.noreply.github.com"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then python main.py post --now; exit $?; fi
+          rc=0
+          for i in 1 2 3; do
+            python main.py post || rc=1
+            rm -f alerted.tmp
+            git add state reports previews || true
+            git diff --cached --quiet || git commit -q -m "newsbot state $(date -u +%FT%TZ)"
+            git pull -q --rebase origin main && git push -q || true
+            [ $i -eq 3 ] && break
+            # sleep to 1 minute past the next 20-minute mark
+            now=$(date -u +%s); next=$(( (now / 1200 + 1) * 1200 + 60 )); sleep $(( next - now ))
+          done
+          exit $rc
 
       - name: check
         if: steps.task.outputs.t == 'check'
@@ -111,4 +126,5 @@ jobs:
           git config user.email "newsbot@users.noreply.github.com"
           git add state reports previews || true
           git diff --cached --quiet || git commit -m "newsbot state $(date -u +%FT%TZ)"
+          git pull -q --rebase origin main || true
           git push

@@ -170,6 +170,23 @@ def llm_json(system: str, user: str, max_tokens: int | None = None):
     raise last
 
 
+def llm_obj(system: str, user: str, max_tokens: int | None = None) -> dict:
+    """like llm_json, but always one object: unwraps [ {...} ] and merges object-per-line output."""
+    j = llm_json(system, user, max_tokens)
+    if isinstance(j, dict):
+        return j
+    if isinstance(j, list):
+        dicts = [x for x in j if isinstance(x, dict)]
+        if len(dicts) == 1:
+            return dicts[0]
+        merged: dict = {}
+        for d in dicts:
+            merged.update(d)
+        if merged:
+            return merged
+    raise ValueError(f"expected a json object, got {type(j).__name__}")
+
+
 def env(name: str, required: bool = True) -> str | None:
     v = os.environ.get(name)
     if required and not v:

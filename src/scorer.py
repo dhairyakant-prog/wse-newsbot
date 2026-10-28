@@ -42,9 +42,14 @@ PROMPT = """Score each story below. For each, return an object:
                       "a woman said in a viral TikTok..."). false only for rumours, anonymous leaks,
                       "sources say" gossip, unverified claims, speculation, or opinion pieces,
  "evergreen_minutes": how long this stays postable, estimate in minutes,
- "has_face": true if a named public figure is central to the story (subject, announcer, quoted)
+ "has_face": true if a named public figure is central to the story (subject, announcer, quoted),
+ "duplicate_of_recent": true if this is the same event/story as anything in ALREADY POSTED below
+                        (even with different wording or a new detail); false otherwise
 }}
 Return a JSON array, same order.
+
+ALREADY POSTED (last 72h):
+{posted}
 
 STORIES:
 {stories}"""
@@ -55,9 +60,24 @@ def _prescore(s: dict, w: dict) -> float:
             + w["reddit_heat"] * s["reddit_heat"] + w["freshness"] * s["freshness"])
 
 
+_STOP = {"The", "A", "An", "And", "Of", "In", "On", "For", "To", "As", "At", "By", "With", "After",
+         "Says", "Said", "Over", "From", "His", "Her", "Their", "Is", "Are", "Was", "Be", "New", "US", "UK"}
+
+
+def _names(text: str) -> set[str]:
+    import re
+    return {w for w in re.findall(r"\b[A-Z][a-zA-Z'\-]{2,}\b", text or "") if w not in _STOP}
+
+
+def _recent_posts(con, hours: float = 72) -> list[str]:
+    return [f"{r['title'] or ''} | {r['headline'] or ''}" for r in con.execute(
+        "select title, headline from posts where created_at > ? and status in ('posted','dry_run')",
+        (hours_ago(hours).isoformat(),))]
+
+
 def _already_done(con, stories: list[dict]) -> list[dict]:
-    recent = [r["title"] for r in con.execute(
-        "select title from posts where created_at > ?", (hours_ago(72).isoformat(),))]
+    recent = _recent_posts(con)
+    recent_names = [_names(r.split(" | ")[0]) for r in _recent_posts(con, 24)]   # source titles: caps = names
     rejected = {r["story_key"] for r in con.execute(
         "select story_key from seen where decision='reject' and first_seen > ?",
         (hours_ago(24).isoformat(),))}
@@ -65,7 +85,10 @@ def _already_done(con, stories: list[dict]) -> list[dict]:
     for s in stories:
         if s["key"] in rejected:
             continue
-        if any(fuzz.token_set_ratio(s["title"], t) >= 70 for t in recent):
+        if any(fuzz.token_set_ratio(s["title"], t) >= 62 for t in recent):
+            continue
+        n = _names(s["title"])
+        if any(len(n & rn) >= 2 for rn in recent_names):     # same people/places = same story
             continue
         keep.append(s)
     return keep
@@ -86,6 +109,7 @@ def score(stories: list[dict]) -> list[dict]:
                 "trending_search": s.get("trend_query")} for s in shortlist]
     judged = llm_json(SYSTEM, PROMPT.format(
         blocked=json.dumps(CFG["safety"]["blocked_themes"]),
+        posted="\n".join("- " + p for p in _recent_posts(con)[-80:]) or "- (none)",
         stories=json.dumps(payload, ensure_ascii=False, indent=1)), max_tokens=6000)
     by_key = {j["key"]: j for j in judged if isinstance(j, dict) and "key" in j}
 
@@ -101,7 +125,9 @@ def score(stories: list[dict]) -> list[dict]:
                  why=j.get("why"), risk=j.get("risk", 10), blocked=j.get("blocked_theme"),
                  confirmed=j.get("is_confirmed_fact", False))
         reason = None
-        if reg not in CFG["coverage"]["regions"]:
+        if j.get("duplicate_of_recent"):
+            reason = "duplicate of a recent post"
+        elif reg not in CFG["coverage"]["regions"]:
             reason = f"out of coverage ({reg})"
         elif s["blocked"]:
             reason = f"blocked theme: {s['blocked']}"

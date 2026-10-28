@@ -19,7 +19,7 @@ from . import facebook, instagram
 from .common import CFG as _CFG
 
 ig = facebook if _CFG.get("platform") == "facebook" else instagram
-from .common import CFG, ROOT, db, hours_ago, llm_json, load_tuning, log, now, save_tuning
+from .common import CFG, ROOT, db, hours_ago, llm_json, llm_obj, load_tuning, log, now, save_tuning
 
 REPORTS = ROOT / "reports"
 REPORTS.mkdir(exist_ok=True)
@@ -243,7 +243,7 @@ def editorial(rows: list[dict], prev: list[dict], t: dict, changes: list) -> tup
                "total_follows": sum(r["follows"] or 0 for r in rows)}
     prev_s = ({"posts": len(prev), "median_reach": int(st.median(r["reach"] or 0 for r in prev)),
                "avg_er": round(st.mean(r["er"] for r in prev), 4)} if prev else "none")
-    j = llm_json(EDITOR, EDITOR_PROMPT.format(
+    j = llm_obj(EDITOR, EDITOR_PROMPT.format(
         hours=CFG["analyst"]["every_hours"], summary=summary, prev=prev_s,
         by_cat=group(rows, lambda r: r["category"]), by_slot=group(rows, lambda r: r["slot"]), by_reg=group(rows, lambda r: r["region"]),
         by_img=group(rows, lambda r: r["image_source"]),

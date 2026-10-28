@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from .common import llm_json, load_tuning
+from .common import llm_json, llm_obj, load_tuning
 
 SYSTEM = """You write for WSE News, a Facebook card-news page in the style of India's biggest card pages
 (like Jist): people-led, plain, direct, factual. No hype words ("shocking", "breaking", "you won't
@@ -69,7 +69,7 @@ Return JSON:
 def write(story: dict) -> dict:
     t = load_tuning()
     guidance = "\n".join(f"- {g}" for g in t["copy_guidance"]) or "- (none yet)"
-    copy = llm_json(SYSTEM, PROMPT.format(
+    copy = llm_obj(SYSTEM, PROMPT.format(
         title=story["title"], context=story["summary"][:900],
         outlets=", ".join(story["outlets"][:8]), category=story["category"],
         region="/".join(story["regions"]), trend=story.get("trend_query") or "none",
