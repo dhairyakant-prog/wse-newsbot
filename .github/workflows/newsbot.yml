@@ -67,16 +67,18 @@ jobs:
           git config user.name "newsbot"
           git config user.email "newsbot@users.noreply.github.com"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then python main.py post --now; exit $?; fi
-          rc=0
-          for i in 1 2 3; do
+          rc=0; start=$(date -u +%s)
+          while :; do
             python main.py post || rc=1
-            rm -f alerted.tmp
             git add state reports previews || true
             git diff --cached --quiet || git commit -q -m "newsbot state $(date -u +%FT%TZ)"
             git pull -q --rebase origin main && git push -q || true
-            [ $i -eq 3 ] && break
-            # sleep to 1 minute past the next 20-minute mark
-            now=$(date -u +%s); next=$(( (now / 1200 + 1) * 1200 + 60 )); sleep $(( next - now ))
+            # next 20-minute mark (+1 min), at least 16 min after this attempt
+            now=$(date -u +%s); next=$(( (now / 1200 + 1) * 1200 + 60 ))
+            [ $(( next - now )) -lt 960 ] && next=$(( next + 1200 ))
+            # stay alive ~1 hour; the next (queued) run takes over
+            [ $(( next - start )) -gt 3720 ] && break
+            sleep $(( next - now ))
           done
           exit $rc
 
