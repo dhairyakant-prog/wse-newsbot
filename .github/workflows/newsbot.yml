@@ -73,12 +73,10 @@ jobs:
             git add state reports previews || true
             git diff --cached --quiet || git commit -q -m "newsbot state $(date -u +%FT%TZ)"
             git pull -q --rebase origin main && git push -q || true
-            # next 20-minute mark (+1 min), at least 16 min after this attempt
-            now=$(date -u +%s); next=$(( (now / 1200 + 1) * 1200 + 60 ))
-            [ $(( next - now )) -lt 960 ] && next=$(( next + 1200 ))
-            # stay alive ~1 hour; the next (queued) run takes over
-            [ $(( next - start )) -gt 3720 ] && break
-            sleep $(( next - now ))
+            # rolling cadence: next attempt 20 min after this one; stay alive ~1 hour,
+            # then the next (queued) run takes over
+            [ $(( $(date -u +%s) - start )) -gt 2700 ] && break
+            sleep 1200
           done
           exit $rc
 
