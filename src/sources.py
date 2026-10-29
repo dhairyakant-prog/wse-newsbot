@@ -189,6 +189,8 @@ def discover() -> list[dict]:
     stories = cluster(items)
     stories = attach_signals(stories, google_trends(), reddit_hot())
     min_src = CFG["discovery"]["min_independent_sources"]
-    kept = [s for s in stories if len(s["outlets"]) >= min_src]
+    funny_regions = {"india", "world"}            # offbeat searches: single-outlet stories allowed
+    kept = [s for s in stories if len(s["outlets"]) >= min_src
+            or (s["outlets"] and set(s.get("regions") or []) & funny_regions)]
     log.info("clusters: %d, with ≥%d outlets: %d", len(stories), min_src, len(kept))
     return kept

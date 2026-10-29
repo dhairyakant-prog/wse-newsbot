@@ -104,7 +104,9 @@ def score(stories: list[dict]) -> list[dict]:
     con = db()
     stories = _already_done(con, stories)
     stories.sort(key=lambda s: _prescore(s, w), reverse=True)
-    shortlist = stories[:25]
+    funny_pool = [s for s in stories if set(s.get("regions") or []) & {"india", "world"}]
+    shortlist = stories[:20]
+    shortlist += [s for s in funny_pool if s not in shortlist][:8]     # offbeat stories always get a look
     if not shortlist:
         return []
 
@@ -131,6 +133,8 @@ def score(stories: list[dict]) -> list[dict]:
         reason = None
         if j.get("duplicate_of_recent"):
             reason = "duplicate of a recent post"
+        elif len(s["outlets"]) < CFG["discovery"]["min_independent_sources"] and s["category"] != "funny":
+            reason = "single source"
         elif reg not in CFG["coverage"]["regions"] and not (
                 s["category"] == "funny" and CFG["coverage"].get("funny_any_region")):
             reason = f"out of coverage ({reg})"
