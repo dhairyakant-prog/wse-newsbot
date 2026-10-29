@@ -67,6 +67,29 @@ def publish(image_path: Path, caption: str) -> tuple[str, str]:
     return post_id, link
 
 
+def publish_reel(video_path: Path, description: str) -> tuple[str, str]:
+    """facebook reels api: start → upload bytes → finish. returns ("reel:<video_id>", permalink)."""
+    tok = page_token()
+    url = f"{GRAPH}/{_v()}/{_page()}/video_reels"
+    r = requests.post(url, timeout=60, data={"upload_phase": "start", "access_token": tok}).json()
+    if "error" in r:
+        raise RuntimeError(f"reel start: {r['error'].get('message')}")
+    vid, up = r["video_id"], r["upload_url"]
+    data = video_path.read_bytes()
+    u = requests.post(up, timeout=300, data=data, headers={
+        "Authorization": f"OAuth {tok}", "offset": "0", "file_size": str(len(data))}).json()
+    if not u.get("success"):
+        raise RuntimeError(f"reel upload: {u}")
+    f = requests.post(url, timeout=60, data={
+        "upload_phase": "finish", "video_id": vid, "video_state": "PUBLISHED",
+        "description": description, "access_token": tok}).json()
+    if "error" in f or not f.get("success", True):
+        raise RuntimeError(f"reel finish: {f.get('error', f)}")
+    link = f"https://www.facebook.com/reel/{vid}"
+    log.info("facebook reel %s %s", vid, link)
+    return f"reel:{vid}", link
+
+
 # ── insights ──────────────────────────────────────────────────
 REACH_METRICS = ["post_impressions_unique", "post_total_media_view_unique"]
 VIEW_METRICS = ["post_media_view", "post_impressions"]
@@ -95,8 +118,37 @@ def _first(obj: str, names: list[str], **extra) -> int:
     return 0
 
 
+def _reel_insights(vid: str) -> dict:
+    out = {"reach": 0, "views": 0}
+    try:
+        j = _get(f"{vid}/video_insights", page_token())
+        for row in j.get("data", []):
+            v = (row.get("values") or [{}])[-1].get("value")
+            if not isinstance(v, (int, float)):
+                continue
+            if row.get("name") in ("post_impressions_unique", "blue_reels_unique_viewers"):
+                out["reach"] = max(out["reach"], int(v))
+            if row.get("name") in ("blue_reels_play_count", "fb_reels_total_plays"):
+                out["views"] = max(out["views"], int(v))
+    except RuntimeError as e:
+        log.warning("reel insights %s: %s", vid, e)
+    try:
+        j = _get(vid, page_token(), fields="likes.summary(true).limit(0),comments.summary(true).limit(0)")
+        out["likes"] = j.get("likes", {}).get("summary", {}).get("total_count", 0)
+        out["comments"] = j.get("comments", {}).get("summary", {}).get("total_count", 0)
+    except RuntimeError as e:
+        log.warning("reel fields %s: %s", vid, e)
+    out.update(shares=0, saved=0, profile_visits=0, follows=0)
+    out["total_interactions"] = out.get("likes", 0) + out.get("comments", 0)
+    if not out["reach"]:
+        out["reach"] = out["views"]
+    return out
+
+
 def media_insights(post_id: str) -> dict:
     """same keys the analyst expects from any platform."""
+    if post_id.startswith("reel:"):
+        return _reel_insights(post_id[5:])
     out = {"reach": _first(post_id, REACH_METRICS), "views": _first(post_id, VIEW_METRICS)}
     try:
         j = _get(post_id, page_token(),

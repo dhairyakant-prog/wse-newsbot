@@ -17,7 +17,7 @@
     "middle_east": 0.25
   },
   "slot_weights": {},
-  "posts_per_day": 72,
+  "posts_per_day": 18,
   "virality_threshold": 4.5,
   "signal_weights": {
     "llm_virality": 0.5,

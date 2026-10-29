@@ -93,13 +93,31 @@ def post(force: bool = False, preview: bool = False) -> None:
         (prev / (path.stem + ".txt")).write_text(caption)
         for old in sorted(prev.glob("*.jpg"))[:-20]:        # keep the last 20
             old.unlink(); (prev / (old.stem + ".txt")).unlink(missing_ok=True)
+        if CFG.get("card", {}).get("format") == "reel":
+            try:
+                from src.reel import render_reel
+                render_reel(copy, img["hero"], path.with_suffix(".mp4"))   # lands in the run's artifacts
+            except Exception as e:  # noqa: BLE001
+                log.warning("preview reel failed: %s", e)
         log.info("dry run → %s", path)
         return
 
     try:
         if CFG["platform"] == "facebook":
-            mid, link = facebook.publish(path, writer.facebook_caption(caption, copy))
-            status, note = "posted", "facebook"
+            fb_caption = writer.facebook_caption(caption, copy)
+            mid = None
+            if CFG.get("card", {}).get("format", "photo") == "reel":
+                try:
+                    from src.reel import render_reel
+                    vpath = render_reel(copy, img["hero"], path.with_suffix(".mp4"))
+                    mid, link = facebook.publish_reel(vpath, fb_caption)
+                    status, note = "posted", "facebook reel"
+                except Exception as e:  # noqa: BLE001
+                    log.warning("reel failed, posting the photo card instead: %s", e)
+                    alerts.raise_("Reel upload failing (photo posted instead)", str(e)[:1500], severity="warning")
+            if not mid:
+                mid, link = facebook.publish(path, fb_caption)
+                status, note = "posted", "facebook"
         else:
             url = instagram.host_image(path)
             mid, link = instagram.publish(url, caption, copy.get("alt_text", copy["headline"]))
