@@ -24,9 +24,12 @@ PROMPT = """Score each story below. For each, return an object:
             (europe includes the UK; middle_east = gulf states, levant, iran, iraq, turkey, egypt.
              india, asia, africa, latin america etc. = other),
  "category": one of [funny, entertainment, sports, human_interest, us, europe, middle_east, business,
-             technology, science, health]. funny = genuinely light, offbeat, laugh-out-loud real news (a goat
-             that boarded a bus, a jugaad invention, a wedding mishap, a record nobody asked for, a pet's
-             antics, a hilarious official notice) — harmless: nobody hurt, killed, humiliated, or mocked for
+             technology, science, health]. funny = light, offbeat, smile-or-laugh real news. USE "funny" for:
+             odd world records (robots dancing, a giant bicycle), absurd bills or fines, a streamer's mishap,
+             a boss gifting a Lamborghini, an animal's antics, a jugaad invention, a wedding mishap, a bizarre
+             object found at airport security, a hilarious official notice, a fan's cheeky moment with a star.
+             prefer "funny" over technology/sports/human_interest whenever the story's appeal is that it is
+             quirky or amusing — harmless: nobody hurt, killed, humiliated, or mocked for
              poverty, religion, caste, disability or ethnicity. entertainment = film/tv/music/celebrity; sports = athletes/teams;
              human_interest = an ordinary person's story, a viral post or video, workplace/money/dating/
              travel/food stories, quirky real-life moments; region name = politics/general hard news,
@@ -198,6 +201,17 @@ def pick(scored: list[dict]) -> dict | None:
         for s in ok:
             s["final"] *= 1 + max(0.0, gap.get(_fmt(s.get("category")), 0)) * 1.6
     ok.sort(key=lambda s: s["final"], reverse=True)
+
+    if fmix:
+        done = [_fmt(c) for c in cats]
+        n = max(1, len(done))
+        lag = max(fmix, key=lambda f: fmix[f] - done.count(f) / n)
+        if fmix[lag] - done.count(lag) / n > 0.05 and _fmt(ok[0].get("category")) != lag:
+            alt = next((s for s in ok if _fmt(s.get("category")) == lag), None)
+            if alt and alt["final"] >= 0.6 * ok[0]["final"]:
+                log.info("format balance: picking %s story over the top story", lag)
+                ok.remove(alt)
+                ok.insert(0, alt)
 
     explore = random.random() < CFG["analyst"]["exploration_share"]
     if explore and len(ok) > 2:
