@@ -45,7 +45,7 @@ def _gn_url(ed: dict, topic: str | None = None, query: str | None = None) -> str
     return f"{GN}?{q}"
 
 
-def _parse_feed(url: str, region_hint: str, topic: str, cutoff) -> list[dict]:
+def _parse_feed(url: str, region_hint: str, topic: str, cutoff, outlet_name: str | None = None) -> list[dict]:
     try:
         feed = feedparser.parse(requests.get(url, headers=UA, timeout=20).content)
     except Exception as e:  # noqa: BLE001
@@ -62,7 +62,12 @@ def _parse_feed(url: str, region_hint: str, topic: str, cutoff) -> list[dict]:
         desc = e.get("summary", "")
         # google bundles related coverage as <li><a>…</a><font>Outlet</font></li>
         outlets = set(re.findall(r"<font[^>]*>([^<]+)</font>", desc)) | ({outlet} if outlet else set())
+        if outlet_name:                                   # direct (non-google) feed
+            outlets = {outlet_name}
+            title = raw_title
         related = [_strip(x) for x in re.findall(r"<a [^>]*>(.*?)</a>", desc)]
+        if outlet_name and not related:                   # direct feeds carry a plain description
+            related = [_strip(desc)[:600]]
         out.append({
             "key": _key(title), "title": title.strip(), "summary": " | ".join(related[:5]),
             "link": e.get("link"), "published": pub.isoformat() if pub else None,
@@ -84,6 +89,9 @@ def google_news() -> list[dict]:
         ed = d.get("search_editions", {}).get(region, us_ed)
         for q in queries:
             out += _parse_feed(_gn_url(ed, query=q), region, "search", cutoff)
+    for region, feeds in d.get("funny_feeds", {}).items():
+        for name, url in feeds.items():
+            out += _parse_feed(url, region, "search", cutoff, outlet_name=name)
     log.info("google news: %d raw items", len(out))
     return out
 

@@ -196,7 +196,7 @@ def pick(scored: list[dict]) -> dict | None:
         n = max(1, len(done))
         gap = {f: fmix[f] - done.count(f) / n for f in fmix}
         for s in ok:
-            s["final"] *= 1 + max(0.0, gap.get(_fmt(s.get("category")), 0)) * 0.8
+            s["final"] *= 1 + max(0.0, gap.get(_fmt(s.get("category")), 0)) * 1.6
     ok.sort(key=lambda s: s["final"], reverse=True)
 
     explore = random.random() < CFG["analyst"]["exploration_share"]

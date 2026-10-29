@@ -56,10 +56,14 @@ discovery:
     middle_east: ["Middle East", "Israel", "Iran", "Saudi Arabia", "UAE OR Dubai OR Qatar",
                   "Gaza OR Lebanon OR Syria", "Turkey Erdogan", "Egypt",
                   "Dubai viral", "Riyadh Season OR Saudi concert", "Cristiano Ronaldo Al Nassr"]
-    india: ["funny viral India", "bizarre India", "hilarious video India", "quirky India news",
-            "desi jugaad viral", "wedding viral video India", "Indian Railways funny OR viral"]
-    world: ["weird news", "odd news", "bizarre news", "funny news", "strange but true",
-            "hilarious viral video", "quirky world record", "animal escapes viral"]
+    india: ["\"goes viral\" OR \"went viral\"", "\"Guinness World Record\"", "\"internet reacts\" OR \"internet can't stop\"",
+            "desi jugaad", "baraat OR wedding viral video", "Indian Railways viral"]
+    world: ["\"goes viral\" OR \"went viral\"", "\"world record\" intitle:record", "intitle:bizarre",
+            "\"odd news\" OR \"strange but true\"", "escaped OR escapes animal viral", "\"internet reacts\""]
+  # direct offbeat / trending feeds (single-outlet; scored like the funny searches)
+  funny_feeds:
+    india: { "Hindustan Times": "https://www.hindustantimes.com/feeds/rss/trending/rssfeed.xml",
+             "NDTV": "https://feeds.feedburner.com/ndtvnews-offbeat-news" }
   # google news edition used for each search region (default: us)
   search_editions:
     india: { gl: "IN", hl: "en-IN", ceid: "IN:en" }
