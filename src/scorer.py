@@ -10,7 +10,8 @@ from .common import CFG, db, hours_ago, llm_json, load_tuning, log, now
 
 SYSTEM = """You are the editor of WSE News, a fast-growing English Facebook news page covering the
 United States, Europe and the Middle East. The page follows the format of India's biggest card-news
-pages (like Jist): mostly people-led stories — a celebrity, athlete or public figure who says, recalls,
+pages (like Jist): mostly people-led stories, plus genuinely funny offbeat news from anywhere
+(India and the rest of the world included) — a celebrity, athlete or public figure who says, recalls,
 reveals or does something; viral human-interest stories (a worker, a traveller, a couple, a family,
 someone's post that went viral about money, jobs, dating, travel, food); and a smaller share of the
 biggest hard news. You judge which stories make people stop scrolling, and you are strict about safety
@@ -19,11 +20,14 @@ and accuracy. You never reward rumours, gossip without an on-record source, or o
 PROMPT = """Score each story below. For each, return an object:
 {{
  "key": <story key>,
- "region": where the story happens or mainly matters: us | europe | middle_east | other
+ "region": where the story happens or mainly matters: us | europe | middle_east | india | other
             (europe includes the UK; middle_east = gulf states, levant, iran, iraq, turkey, egypt.
              india, asia, africa, latin america etc. = other),
- "category": one of [entertainment, sports, human_interest, us, europe, middle_east, business, technology,
-             science, health]. entertainment = film/tv/music/celebrity; sports = athletes/teams;
+ "category": one of [funny, entertainment, sports, human_interest, us, europe, middle_east, business,
+             technology, science, health]. funny = genuinely light, offbeat, laugh-out-loud real news (a goat
+             that boarded a bus, a jugaad invention, a wedding mishap, a record nobody asked for, a pet's
+             antics, a hilarious official notice) — harmless: nobody hurt, killed, humiliated, or mocked for
+             poverty, religion, caste, disability or ethnicity. entertainment = film/tv/music/celebrity; sports = athletes/teams;
              human_interest = an ordinary person's story, a viral post or video, workplace/money/dating/
              travel/food stories, quirky real-life moments; region name = politics/general hard news,
  "virality": 0-10  (would a 18-45 facebook user in the US, Europe or the Middle East stop, react, comment
@@ -119,7 +123,7 @@ def score(stories: list[dict]) -> list[dict]:
         if not j:
             continue
         reg = j.get("region", "other")
-        if reg in CFG["coverage"]["regions"]:
+        if reg in CFG["coverage"]["regions"] or j.get("category") == "funny":
             s["regions"] = [reg]
         s.update(category=j.get("category", reg), llm_virality=j.get("virality", 0) / 10,
                  why=j.get("why"), risk=j.get("risk", 10), blocked=j.get("blocked_theme"),
@@ -127,7 +131,8 @@ def score(stories: list[dict]) -> list[dict]:
         reason = None
         if j.get("duplicate_of_recent"):
             reason = "duplicate of a recent post"
-        elif reg not in CFG["coverage"]["regions"]:
+        elif reg not in CFG["coverage"]["regions"] and not (
+                s["category"] == "funny" and CFG["coverage"].get("funny_any_region")):
             reason = f"out of coverage ({reg})"
         elif s["blocked"]:
             reason = f"blocked theme: {s['blocked']}"
@@ -154,6 +159,8 @@ def _fmt(category: str | None) -> str:
         return "celebrity"
     if category == "human_interest":
         return "human_interest"
+    if category == "funny":
+        return "funny"
     return "news"
 
 

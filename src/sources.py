@@ -81,8 +81,9 @@ def google_news() -> list[dict]:
             out += _parse_feed(_gn_url(ed, topic=topic), region, (topic or "top").lower(), cutoff)
     us_ed = d["editions"]["us"]
     for region, queries in d.get("searches", {}).items():
+        ed = d.get("search_editions", {}).get(region, us_ed)
         for q in queries:
-            out += _parse_feed(_gn_url(us_ed, query=q), region, "search", cutoff)
+            out += _parse_feed(_gn_url(ed, query=q), region, "search", cutoff)
     log.info("google news: %d raw items", len(out))
     return out
 

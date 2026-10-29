@@ -35,6 +35,8 @@ HEADLINE PATTERN (copy this exactly in spirit):
        "Prominent MAGA Voices Question Their Trump Support As Divisions Surface"
 - for an ordinary person: describe them ("Texas Nurse", "London Commuter, 29", "Woman In Viral TikTok")
 - the surprising detail (number, twist, admission) goes in the middle of the sentence
+- funny/offbeat stories: let the absurd detail carry the joke, deadpan, no puns or emojis
+  e.g. "Goat Boards Kerala State Bus, Refuses To Get Off Until Conductor Gives It A Seat"
 - 10-16 words, one sentence, no full stop, no quote marks, digits for numbers
 
 Return JSON:
@@ -47,7 +49,7 @@ Return JSON:
  "caption": "exactly 3 short sentences, a plain factual summary: who, what was said or happened, and
              one line of context or what's next. no question, no emojis, no hashtags.",
  "hashtags": ["exactly 5 tags without #: the person's name, the show/team/company/place, the topic,
-              and one broad tag like EntertainmentNews, SportsNews, ViralNews or WorldNews. no party tags"],
+              and one broad tag like EntertainmentNews, SportsNews, ViralNews, FunnyNews or WorldNews. no party tags"],
  "alt_text": "one sentence describing the card for screen readers",
  "image": {{
    "subject_type": "person whenever ANY named public figure appears in the material above.

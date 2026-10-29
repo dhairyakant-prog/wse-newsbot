@@ -18,11 +18,13 @@ llm:
   model: "claude-sonnet-5-5"
   max_tokens: 2000
 
-format_mix: { celebrity: 0.55, human_interest: 0.30, news: 0.15 }   # jist pattern; pick() nudges toward the lagging one
+format_mix: { celebrity: 0.45, human_interest: 0.25, funny: 0.15, news: 0.15 }   # jist pattern + funny; pick() nudges toward the lagging one
 
 coverage:
   # only these regions are ever posted. anything else is dropped at scoring.
   regions: ["us", "europe", "middle_east"]
+  # funny / offbeat stories may come from anywhere (india and the rest of the world too)
+  funny_any_region: true
   target_mix: { us: 0.45, europe: 0.30, middle_east: 0.25 }   # starting point; analyst retunes
 
 posting:
@@ -53,6 +55,13 @@ discovery:
     middle_east: ["Middle East", "Israel", "Iran", "Saudi Arabia", "UAE OR Dubai OR Qatar",
                   "Gaza OR Lebanon OR Syria", "Turkey Erdogan", "Egypt",
                   "Dubai viral", "Riyadh Season OR Saudi concert", "Cristiano Ronaldo Al Nassr"]
+    india: ["funny viral India", "bizarre India", "hilarious video India", "quirky India news",
+            "desi jugaad viral", "wedding viral video India", "Indian Railways funny OR viral"]
+    world: ["weird news", "odd news", "bizarre news", "funny news", "strange but true",
+            "hilarious viral video", "quirky world record", "animal escapes viral"]
+  # google news edition used for each search region (default: us)
+  search_editions:
+    india: { gl: "IN", hl: "en-IN", ceid: "IN:en" }
   reddit_subs: []                 # reddit blocks github servers; left off
   trends_geo: ["US", "GB", "DE", "AE", "SA"]
   min_independent_sources: 2     # story must be carried by ≥ N different outlets
