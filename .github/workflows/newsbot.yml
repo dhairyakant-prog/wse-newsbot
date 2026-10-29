@@ -53,6 +53,8 @@ jobs:
           path: ~/.u2net
           key: u2net-human-seg
       - run: pip install -r requirements.txt
+      - name: ffmpeg (for reels)
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
 
       - name: decide task
         id: task
