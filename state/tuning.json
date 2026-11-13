@@ -1,36 +1,72 @@
 {
   "category_weights": {
-    "us": 1.0,
-    "europe": 1.0,
-    "middle_east": 1.0,
-    "business": 1.0,
+    "us": 0.918,
+    "europe": 1.241,
+    "middle_east": 0.833,
+    "business": 1.115,
     "technology": 1.0,
-    "entertainment": 1.0,
-    "sports": 1.0,
+    "entertainment": 0.978,
+    "sports": 1.001,
     "science": 1.0,
     "health": 1.0,
-    "human_interest": 1.0
+    "human_interest": 1.053,
+    "funny": 0.959
   },
   "region_mix": {
-    "us": 0.45,
-    "europe": 0.3,
-    "middle_east": 0.25
+    "us": 0.443,
+    "europe": 0.308,
+    "middle_east": 0.249
   },
-  "slot_weights": {},
-  "posts_per_day": 18,
+  "slot_weights": {
+    "10:40": 1.212,
+    "12:00": 1.079,
+    "13:20": 1.019,
+    "14:40": 1.067,
+    "16:00": 0.833,
+    "17:20": 1.028,
+    "18:40": 1.097,
+    "20:00": 1.058,
+    "21:20": 0.827,
+    "22:40": 0.845,
+    "00:00": 0.942,
+    "01:20": 0.915,
+    "04:00": 0.836,
+    "05:20": 0.953,
+    "06:40": 0.827,
+    "08:00": 1.106,
+    "09:20": 1.25,
+    "02:40": 0.995
+  },
+  "posts_per_day": 19,
   "virality_threshold": 4.5,
   "signal_weights": {
-    "llm_virality": 0.5,
-    "coverage": 0.2,
-    "trend_match": 0.2,
+    "llm_virality": 0.463,
+    "coverage": 0.214,
+    "trend_match": 0.201,
     "reddit_heat": 0.0,
-    "freshness": 0.1
+    "freshness": 0.122
   },
-  "copy_guidance": [],
-  "hashtag_blocklist": [],
-  "hashtag_boost": [],
-  "headline_max_words": 16,
+  "copy_guidance": [
+    "Lead with the named person or organization plus one concrete fact, as in 'Man Utd Open Talks With Pochettino'. Avoid vague teasers.",
+    "Keep headlines to 12 words or fewer; top posts are short, single-claim lines.",
+    "Prefer Europe-angle and business/world stories for the 08:00-10:40 UTC slots; test one US or funny story per day in those slots to separate topic from timing.",
+    "For funny and viral stories, state the real event plainly in the headline and do not repeat unverified viral claims; skip stories whose only hook is a social media joke.",
+    "Add a neutral context clause (who, where, what changed) rather than opinion or loaded words, especially for Trump, Ukraine and Middle East stories.",
+    "End with a plain question or 'what to know' framing on at most 2 posts a day, to test whether it lifts comments or shares from zero."
+  ],
+  "hashtag_blocklist": [
+    "FunnyNews",
+    "ViralNews"
+  ],
+  "hashtag_boost": [
+    "WorldNews",
+    "SportsNews",
+    "PremierLeague",
+    "Ukraine",
+    "Nvidia"
+  ],
+  "headline_max_words": 12,
   "image_style": "photo",
-  "updated_at": "2026-10-24T03:13:42.557235+00:00",
-  "last_review": "2026-10-24T03:13:42.557222+00:00"
+  "updated_at": "2026-11-13T04:14:31.701512+00:00",
+  "last_review": "2026-11-13T04:14:31.701498+00:00"
 }
